@@ -1,0 +1,61 @@
+const { body, param } = require('express-validator');
+
+const createTaskValidator = [
+  body('title').notEmpty().withMessage('Task title is required'),
+  body('description').optional(),
+  body('task_key').notEmpty().withMessage('Task key is required'),
+  body('project_id').isInt().withMessage('Project ID is required and must be a number'),
+  body('sprint_id').optional().isInt().withMessage('Sprint ID must be a number'),
+  body('assigned_to').optional().isInt().withMessage('Assigned user ID must be a number'),
+  body('type').optional().isIn(['story', 'bug', 'task', 'epic']).withMessage('Invalid task type'),
+  body('priority').optional().isIn(['lowest', 'low', 'medium', 'high', 'highest']).withMessage('Invalid priority'),
+  body('story_points').optional().isInt().withMessage('Story points must be a number'),
+  body('estimated_hours').optional().isFloat().withMessage('Estimated hours must be a number'),
+  body('due_date').optional().isISO8601().withMessage('Invalid due date format')
+];
+
+const updateTaskValidator = [
+  param('id').isInt().withMessage('Task ID must be a number'),
+  body('title').optional().notEmpty().withMessage('Task title cannot be empty'),
+  body('sprint_id').optional({ checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
+  body('assigned_to').optional().isInt().withMessage('Assigned user ID must be a number'),
+  body('type').optional().isIn(['story', 'bug', 'task', 'epic']).withMessage('Invalid task type'),
+  body('priority').optional().isIn(['lowest', 'low', 'medium', 'high', 'highest']).withMessage('Invalid priority'),
+  body('story_points').optional().isInt().withMessage('Story points must be a number'),
+  body('estimated_hours').optional().isFloat().withMessage('Estimated hours must be a number'),
+  body('due_date').optional().isISO8601().withMessage('Invalid due date format')
+];
+
+const updateStatusValidator = [
+  param('id').isInt().withMessage('Task ID must be a number'),
+  body('status').isIn(['todo', 'in_progress', 'in_review', 'done']).withMessage('Invalid status')
+];
+
+const taskIdValidator = [
+  param('id').isInt().withMessage('Task ID must be a number')
+];
+
+const projectIdValidator = [
+  param('projectId').isInt().withMessage('Project ID must be a number')
+];
+
+const sprintIdValidator = [
+  param('sprintId').isInt().withMessage('Sprint ID must be a number')
+];
+
+const addLinkValidator = [
+  param('id').isInt().withMessage('Task ID must be a number'),
+  body('url').isURL().withMessage('Valid URL is required'),
+  body('title').optional(),
+  body('description').optional()
+];
+
+module.exports = {
+  createTaskValidator,
+  updateTaskValidator,
+  updateStatusValidator,
+  taskIdValidator,
+  projectIdValidator,
+  sprintIdValidator,
+  addLinkValidator
+};

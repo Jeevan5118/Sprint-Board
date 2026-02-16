@@ -1,0 +1,55 @@
+﻿Admin logged in
+
+=== TEAMS ===
+
+Team: "Team V1771042293736" (ID: 5)
+  Members (1):
+    - System Admin (admin@scrumboard.com, role: admin, user_id: 1)
+
+Team: "Verify Team 1771042189049" (ID: 4)
+  Members (1):
+    - System Admin (admin@scrumboard.com, role: admin, user_id: 1)
+
+Team: "Demo Team" (ID: 3)
+  Members (1):
+    - System Admin (admin@scrumboard.com, role: admin, user_id: 1)
+
+Team: "Team Alpha" (ID: 1)
+  Members (11):
+    - Test User (test@test.com, role: member, user_id: 22)
+    - Alice Johnson (alice.johnson@scrumboard.com, role: team_lead, user_id: 2)
+    - Bob Smith (bob.smith@scrumboard.com, role: member, user_id: 3)
+    - Carol Williams (carol.williams@scrumboard.com, role: member, user_id: 4)
+    - David Brown (david.brown@scrumboard.com, role: member, user_id: 5)
+    - Emma Davis (emma.davis@scrumboard.com, role: member, user_id: 6)
+    - Frank Miller (frank.miller@scrumboard.com, role: member, user_id: 7)
+    - Grace Wilson (grace.wilson@scrumboard.com, role: member, user_id: 8)
+    - Henry Moore (henry.moore@scrumboard.com, role: member, user_id: 9)
+    - Iris Taylor (iris.taylor@scrumboard.com, role: member, user_id: 10)
+    - Jack Anderson (jack.anderson@scrumboard.com, role: member, user_id: 11)
+
+Team: "Team Beta" (ID: 2)
+  Members (10):
+    - Kate Thomas (kate.thomas@scrumboard.com, role: team_lead, user_id: 12)
+    - Liam Jackson (liam.jackson@scrumboard.com, role: member, user_id: 13)
+    - Mia White (mia.white@scrumboard.com, role: member, user_id: 14)
+    - Noah Harris (noah.harris@scrumboard.com, role: member, user_id: 15)
+    - Olivia Martin (olivia.martin@scrumboard.com, role: member, user_id: 16)
+    - Paul Thompson (paul.thompson@scrumboard.com, role: member, user_id: 17)
+    - Quinn Garcia (quinn.garcia@scrumboard.com, role: member, user_id: 18)
+    - Ryan Martinez (ryan.martinez@scrumboard.com, role: member, user_id: 19)
+    - Sophia Robinson (sophia.robinson@scrumboard.com, role: member, user_id: 20)
+    - Tyler Clark (tyler.clark@scrumboard.com, role: member, user_id: 21)
+
+=== PROJECTS ===
+  Project: "Proj V1771042293881" (ID: 9, team_id: 5)
+  Project: "Verify Project 1771042189120" (ID: 8, team_id: 4)
+  Project: "Test Project 1771040425140" (ID: 7, team_id: 3)
+  Project: "Demo Project" (ID: 6, team_id: 3)
+  Project: "Test Project 1771003586441" (ID: 5, team_id: 1)
+  Project: "E-Commerce Platform" (ID: 1, team_id: 1)
+  Project: "Mobile Banking App" (ID: 2, team_id: 1)
+  Project: "Cloud Infrastructure" (ID: 3, team_id: 2)
+  Project: "API Gateway Service" (ID: 4, team_id: 2)
+
+=== MEMBER LOGIN ATTEMPTS ===

@@ -1,0 +1,88 @@
+import api from './api';
+
+export const taskService = {
+  getTasksBySprint: async (sprintId) => {
+    const res = await api.get(`/tasks/sprint/${sprintId}`);
+    return res.data.data.tasks;
+  },
+
+  getBacklogByProject: async (projectId, sprintId) => {
+    // Backlog = project tasks not in the current sprint
+    const res = await api.get(`/tasks/project/${projectId}`);
+    const all = res.data.data.tasks || [];
+    // Hide tasks from completed sprints; they are intentionally immutable.
+    // Keep tasks with no sprint, or tasks from other non-completed sprints.
+    return all.filter(
+      (t) =>
+        t.sprint_status !== 'completed' &&
+        (
+          t.sprint_id === null ||
+          t.sprint_id === undefined ||
+          String(t.sprint_id) !== String(sprintId)
+        )
+    );
+  },
+
+  updateStatus: async (taskId, status) => {
+    const res = await api.patch(`/tasks/${taskId}/status`, { status });
+    return res.data.data.task;
+  },
+
+  updateAssignee: async (taskId, userId) => {
+    const res = await api.patch(`/tasks/${taskId}/assignee`, { assigned_to: userId });
+    return res.data.data.task;
+  },
+
+  getTaskDetails: async (taskId) => {
+    const res = await api.get(`/tasks/${taskId}`);
+    return res.data.data.task;
+  },
+
+  updateStoryPoints: async (taskId, storyPoints) => {
+    const res = await api.put(`/tasks/${taskId}`, { story_points: storyPoints });
+    return res.data.data.task;
+  },
+
+  getComments: async (taskId) => {
+    const res = await api.get(`/comments/task/${taskId}`);
+    return res.data.data.comments;
+  },
+
+  addComment: async (taskId, content) => {
+    const res = await api.post(`/comments/task/${taskId}`, { content });
+    return res.data.data.comment;
+  },
+  deleteComment: async (commentId) => {
+    const res = await api.delete(`/comments/${commentId}`);
+    return res.data;
+  },
+
+  uploadAttachment: async (taskId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post(`/tasks/${taskId}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data.data.attachments;
+  },
+
+  addLink: async (taskId, { url, title, description }) => {
+    const res = await api.post(`/tasks/${taskId}/links`, { url, title, description });
+    return res.data.data.links;
+  },
+
+  createTask: async (taskData) => {
+    const res = await api.post('/tasks', taskData);
+    return res.data.data.task;
+  },
+
+  updateTask: async (taskId, taskData) => {
+    const res = await api.put(`/tasks/${taskId}`, taskData);
+    return res.data.data.task;
+  },
+  deleteTask: async (taskId) => {
+    const res = await api.delete(`/tasks/${taskId}`);
+    return res.data;
+  }
+};
+

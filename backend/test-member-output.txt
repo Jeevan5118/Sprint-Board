@@ -1,0 +1,10 @@
+﻿=== TEST: Member (bob.smith) Visibility ===
+Γ£à Bob logged in (ID: 3)
+  Projects: 3
+    - Test Project 1771003586441 (team: 1)
+    - E-Commerce Platform (team: 1)
+    - Mobile Banking App (team: 1)
+  Dashboard: {"assigned_tasks":5,"completed_tasks":"3","pending_tasks":"2","in_progress_tasks":"1"}
+  Sprint 3 Tasks: 4
+
+=== TEST: Non-team Member Visibility ===
