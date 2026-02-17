@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { projectService } from '../../services/projectService';
 import { teamService } from '../../services/teamService';
 import { taskService } from '../../services/taskService';
+import { getErrorMessage } from '../../utils/error';
 
 const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose, onTaskCreated }) => {
     const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose,
                     setTeamMembers(members);
                 }
             } catch (err) {
-                console.error('Failed to fetch team members', err);
+                setError(getErrorMessage(err, 'Failed to fetch team members'));
             }
         };
         fetchMembers();
@@ -40,18 +41,38 @@ const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose,
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
+        if (!formData.title.trim()) {
+            setError('Summary is required.');
+            return;
+        }
+        if (Number(formData.story_points) < 0) {
+            setError('Story points cannot be negative.');
+            return;
+        }
+        if (formData.due_date) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(formData.due_date);
+            if (due < today) {
+                setError('Due date cannot be in the past.');
+                return;
+            }
+        }
+        setLoading(true);
         try {
             await taskService.createTask({
                 ...formData,
+                title: formData.title.trim(),
+                story_points: formData.story_points === '' ? null : Number(formData.story_points),
+                assigned_to: formData.assigned_to || null,
                 project_id: projectId,
-                sprint_id: sprintId
+                sprint_id: sprintId ? Number(sprintId) : null
             });
             onTaskCreated();
             onClose();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create task');
+            setError(getErrorMessage(err, 'Failed to create task'));
         } finally {
             setLoading(false);
         }

@@ -7,6 +7,8 @@ import BoardColumn from '../components/Board/BoardColumn';
 import TaskDetailDrawer from '../components/Board/TaskDetailDrawer';
 import CreateTaskModal from '../components/Board/CreateTaskModal';
 import { useAuth } from '../context/AuthContext';
+import useDebouncedValue from '../hooks/useDebouncedValue';
+import { getErrorMessage } from '../utils/error';
 
 const SprintBoard = () => {
   const { projectId, sprintId } = useParams();
@@ -21,7 +23,9 @@ const SprintBoard = () => {
   const [onlyMyIssues, setOnlyMyIssues] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [initialCreateStatus, setInitialCreateStatus] = useState('todo');
+  const [actionMessage, setActionMessage] = useState('');
   const { user } = useAuth();
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 220);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -39,7 +43,7 @@ const SprintBoard = () => {
       // Normalize IDs to strings to handle mixed number/string payloads
       setSprint(sprintsData.find((s) => String(s.id) === String(sprintId)));
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load tasks');
+      setError(getErrorMessage(err, 'Failed to load tasks'));
     } finally {
       setLoading(false);
     }
@@ -51,8 +55,9 @@ const SprintBoard = () => {
 
   const filterTasks = (taskList) => {
     return taskList.filter(t => {
-      const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (t.task_key && t.task_key.toLowerCase().includes(searchTerm.toLowerCase()));
+      const query = debouncedSearchTerm.toLowerCase();
+      const matchesSearch = t.title.toLowerCase().includes(query) ||
+        (t.task_key && t.task_key.toLowerCase().includes(query));
       const matchesMyIssues = !onlyMyIssues || t.assigned_to === user?.id;
       return matchesSearch && matchesMyIssues;
     });
@@ -95,9 +100,11 @@ const SprintBoard = () => {
           return [updated, ...others];
         });
       }
+      setActionMessage('Task moved successfully.');
+      setTimeout(() => setActionMessage(''), 1600);
     } catch (err) {
       console.error('Failed to update task status/sprint', err);
-      alert(err.response?.data?.message || 'Failed to move task');
+      alert(getErrorMessage(err, 'Failed to move task'));
       fetchTasks();
     }
   };
@@ -127,6 +134,11 @@ const SprintBoard = () => {
   return (
     <div className="flex flex-col h-full bg-[#EBECF0]">
       <div className="px-8 pt-6 pb-2">
+        {actionMessage && (
+          <div className="mb-3 rounded-[3px] border border-[#B3DFCC] bg-[#E3FCEF] px-3 py-2 text-sm text-[#006644]">
+            {actionMessage}
+          </div>
+        )}
         <div className="flex justify-between items-start mb-4">
           <div>
             <nav className="flex items-center gap-1 text-[13px] text-gray-400 mb-2">

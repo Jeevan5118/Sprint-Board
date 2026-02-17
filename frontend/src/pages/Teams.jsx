@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { teamService } from '../services/teamService';
 import { authService } from '../services/authService';
 import BackButton from '../components/Common/BackButton';
+import { getErrorMessage } from '../utils/error';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const Teams = () => {
     const { user } = useAuth();
@@ -16,8 +18,14 @@ const Teams = () => {
     const [expandedTeams, setExpandedTeams] = useState({}); // { teamId: { members: [], loading: false } }
     const [addingMemberTo, setAddingMemberTo] = useState(null);
     const [selectedUserId, setSelectedUserId] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 6;
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, 250);
 
     const fetchTeams = useCallback(async () => {
+        setLoadError('');
         try {
             if (user?.role === 'admin') {
                 const data = await teamService.getAllTeams();
@@ -32,7 +40,7 @@ const Teams = () => {
                 setExpandedTeams(expanded);
             }
         } catch (err) {
-            console.error(err);
+            setLoadError(getErrorMessage(err, 'Failed to load teams'));
         } finally {
             setLoading(false);
         }
@@ -50,7 +58,7 @@ const Teams = () => {
             const users = await authService.getAllUsers();
             setAllUsers(users);
         } catch (err) {
-            console.error(err);
+            setLoadError(getErrorMessage(err, 'Failed to load users'));
         }
     };
 
@@ -86,7 +94,7 @@ const Teams = () => {
             console.error('Failed to fetch team members', err);
             setExpandedTeams(prev => ({
                 ...prev,
-                [teamId]: { loading: false, members: [], error: 'Failed to load' }
+                [teamId]: { loading: false, members: [], error: getErrorMessage(err, 'Failed to load members') }
             }));
         }
     };
@@ -100,7 +108,7 @@ const Teams = () => {
             setNewTeamDescription('');
             fetchTeams();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create team');
+            setError(getErrorMessage(err, 'Failed to create team'));
         }
     };
 
@@ -117,7 +125,7 @@ const Teams = () => {
                 [teamId]: { loading: false, members: teamData.members || [] }
             }));
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to add member');
+            alert(getErrorMessage(err, 'Failed to add member'));
         }
     };
 
@@ -132,9 +140,21 @@ const Teams = () => {
                 [teamId]: { loading: false, members: teamData.members || [] }
             }));
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to remove member');
+            alert(getErrorMessage(err, 'Failed to remove member'));
         }
     };
+
+    const filteredTeams = teams.filter((team) => {
+        const q = debouncedSearchTerm.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            team.name.toLowerCase().includes(q) ||
+            (team.description || '').toLowerCase().includes(q)
+        );
+    });
+    const totalPages = Math.max(1, Math.ceil(filteredTeams.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const pagedTeams = filteredTeams.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
     return (
         <div className="p-8 bg-[#F4F7FA] min-h-screen">
@@ -145,6 +165,17 @@ const Teams = () => {
                         <h1 className="text-3xl font-extrabold text-[#172B4D] tracking-tight">Teams</h1>
                         <p className="text-gray-500 mt-2">Manage your team members and roles efficiently.</p>
                     </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setPage(1);
+                            }}
+                            placeholder="Search teams"
+                            className="border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
+                        />
                     {user?.role === 'admin' && (
                         <button
                             onClick={() => setShowModal(true)}
@@ -153,6 +184,7 @@ const Teams = () => {
                             <span>+</span> Create team
                         </button>
                     )}
+                    </div>
                 </div>
 
                 {loading ? (
@@ -161,10 +193,13 @@ const Teams = () => {
                     </div>
                 ) : (
                     <>
-                        {teams.length === 0 ? (
+                        {loadError && (
+                            <div className="mb-4 p-3 bg-[#FFEBE6] text-[#DE350B] text-sm rounded-[3px]">{loadError}</div>
+                        )}
+                        {filteredTeams.length === 0 ? (
                             <div className="text-center py-20 bg-gray-50 rounded-lg shadow-sm border border-[#DFE1E6] border-dashed">
                                 <h3 className="text-lg font-medium text-[#172B4D]">No teams found</h3>
-                                <p className="mt-1 text-[#5E6C84]">Get started by creating a new team.</p>
+                                <p className="mt-1 text-[#5E6C84]">{searchTerm ? 'Try a different search.' : 'Get started by creating a new team.'}</p>
                             </div>
                         ) : (
                             <div className="border border-[#DFE1E6] rounded-lg overflow-hidden bg-white shadow-sm transition-all duration-300">
@@ -177,7 +212,7 @@ const Teams = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-[#DFE1E6]">
-                                        {teams.map((team) => (
+                                        {pagedTeams.map((team) => (
                                             <React.Fragment key={team.id}>
                                                 <tr
                                                     className={`hover:bg-[#FAFBFC] transition-colors cursor-pointer group ${expandedTeams[team.id] ? 'bg-[#FAFBFC]' : ''}`}
@@ -265,6 +300,10 @@ const Teams = () => {
                                                                         <div className="animate-spin h-4 w-4 border-2 border-[#0052CC] border-t-transparent rounded-full"></div>
                                                                         Loading members...
                                                                     </div>
+                                                                ) : expandedTeams[team.id].error ? (
+                                                                    <div className="text-sm text-[#DE350B] bg-[#FFEBE6] p-4 rounded-md border border-[#FFBDAD]">
+                                                                        {expandedTeams[team.id].error}
+                                                                    </div>
                                                                 ) : expandedTeams[team.id].members.length === 0 ? (
                                                                     <div className="text-sm text-[#5E6C84] italic bg-white p-4 rounded-md border border-dashed border-[#DFE1E6]">
                                                                         No members in this team yet.
@@ -303,6 +342,27 @@ const Teams = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                                <div className="flex items-center justify-between px-4 py-3 border-t border-[#DFE1E6] bg-[#FAFBFC] text-sm">
+                                    <span className="text-[#5E6C84]">Page {safePage} of {totalPages}</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={safePage === 1}
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                            className="btn-secondary disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={safePage === totalPages}
+                                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                            className="btn-secondary disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </>

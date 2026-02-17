@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { projectService } from '../services/projectService';
 import { sprintService } from '../services/sprintService';
 import BackButton from '../components/Common/BackButton';
+import { getErrorMessage } from '../utils/error';
 
 const ProjectDetails = () => {
     const { projectId } = useParams();
@@ -50,8 +51,17 @@ const ProjectDetails = () => {
 
     const handleCreateSprint = async (e) => {
         e.preventDefault();
+        setError('');
+        if (!formData.name.trim()) {
+            setError('Sprint name is required.');
+            return;
+        }
+        if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
+            setError('End date cannot be before start date.');
+            return;
+        }
         try {
-            await sprintService.createSprint({ ...formData, project_id: projectId });
+            await sprintService.createSprint({ ...formData, name: formData.name.trim(), project_id: projectId });
             setShowModal(false);
             setFormData({
                 name: '',
@@ -61,7 +71,7 @@ const ProjectDetails = () => {
             });
             fetchData();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create sprint');
+            setError(getErrorMessage(err, 'Failed to create sprint'));
         }
     };
 
@@ -71,7 +81,7 @@ const ProjectDetails = () => {
             await sprintService.startSprint(sprintId);
             fetchData();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to start sprint');
+            alert(getErrorMessage(err, 'Failed to start sprint'));
         }
     };
 
@@ -81,7 +91,7 @@ const ProjectDetails = () => {
             await sprintService.completeSprint(sprintId);
             fetchData();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to complete sprint');
+            alert(getErrorMessage(err, 'Failed to complete sprint'));
         }
     };
 
@@ -92,7 +102,7 @@ const ProjectDetails = () => {
             await projectService.deleteProject(projectId);
             window.location.href = '/projects';
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to delete project');
+            alert(getErrorMessage(err, 'Failed to delete project'));
             setIsDeleting(false);
         }
     };

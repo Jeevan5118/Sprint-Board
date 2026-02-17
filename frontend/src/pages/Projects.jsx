@@ -4,6 +4,8 @@ import { projectService } from '../services/projectService';
 import { teamService } from '../services/teamService';
 import { useAuth } from '../context/AuthContext';
 import BackButton from '../components/Common/BackButton';
+import { getErrorMessage } from '../utils/error';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const Projects = () => {
     const { user } = useAuth();
@@ -12,6 +14,11 @@ const Projects = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 8;
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, 250);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -24,6 +31,7 @@ const Projects = () => {
     });
 
     const fetchData = useCallback(async () => {
+        setLoadError('');
         try {
             const projectsData = await projectService.getAllProjects();
             setProjects(projectsData);
@@ -33,7 +41,7 @@ const Projects = () => {
                 setTeams(teamsData);
             }
         } catch (err) {
-            console.error(err);
+            setLoadError(getErrorMessage(err, 'Failed to load projects'));
         } finally {
             setLoading(false);
         }
@@ -52,8 +60,18 @@ const Projects = () => {
 
     const handleCreateProject = async (e) => {
         e.preventDefault();
+        setError('');
+        const key = formData.key_code.trim().toUpperCase();
+        if (!/^[A-Z0-9]{2,10}$/.test(key)) {
+            setError('Project key must be 2-10 characters (A-Z, 0-9).');
+            return;
+        }
+        if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
+            setError('End date cannot be before start date.');
+            return;
+        }
         try {
-            await projectService.createProject(formData);
+            await projectService.createProject({ ...formData, key_code: key });
             setShowModal(false);
             setFormData({
                 name: '',
@@ -65,9 +83,21 @@ const Projects = () => {
             });
             fetchData();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create project');
+            setError(getErrorMessage(err, 'Failed to create project'));
         }
     };
+
+    const filteredProjects = projects.filter((project) => {
+        const q = debouncedSearchTerm.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            project.name.toLowerCase().includes(q) ||
+            project.key_code.toLowerCase().includes(q)
+        );
+    });
+    const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const pagedProjects = filteredProjects.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
     return (
         <div className="p-8 bg-white min-h-screen">
@@ -78,6 +108,17 @@ const Projects = () => {
                         <h1 className="text-3xl font-extrabold text-[#172B4D] tracking-tight">Projects</h1>
                         <p className="text-gray-500 mt-2">Manage and monitor all your agile projects.</p>
                     </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setPage(1);
+                            }}
+                            placeholder="Search by name or key"
+                            className="border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
+                        />
                     {user?.role === 'admin' && (
                         <button
                             onClick={() => setShowModal(true)}
@@ -86,6 +127,7 @@ const Projects = () => {
                             <span>+</span> Create project
                         </button>
                     )}
+                    </div>
                 </div>
 
                 {loading ? (
@@ -94,10 +136,13 @@ const Projects = () => {
                     </div>
                 ) : (
                     <>
-                        {projects.length === 0 ? (
+                        {loadError && (
+                            <div className="mb-4 p-3 bg-[#FFEBE6] text-[#DE350B] text-sm rounded-[3px]">{loadError}</div>
+                        )}
+                        {filteredProjects.length === 0 ? (
                             <div className="text-center py-20 bg-gray-50 rounded-lg">
                                 <h3 className="text-lg font-medium text-[#172B4D]">No projects found</h3>
-                                <p className="mt-1 text-[#5E6C84]">Start by creating your first project.</p>
+                                <p className="mt-1 text-[#5E6C84]">{searchTerm ? 'Try a different search.' : 'Start by creating your first project.'}</p>
                             </div>
                         ) : (
                             <div className="border border-[#DFE1E6] rounded-[3px] overflow-hidden bg-white">
@@ -112,7 +157,7 @@ const Projects = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-[#DFE1E6]">
-                                        {projects.map((project) => (
+                                        {pagedProjects.map((project) => (
                                             <tr key={project.id} className="hover:bg-[#FAFBFC] transition-colors group">
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex items-center">
@@ -149,6 +194,27 @@ const Projects = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                                <div className="flex items-center justify-between px-4 py-3 border-t border-[#DFE1E6] bg-[#FAFBFC] text-sm">
+                                    <span className="text-[#5E6C84]">Page {safePage} of {totalPages}</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={safePage === 1}
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                            className="btn-secondary disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={safePage === totalPages}
+                                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                            className="btn-secondary disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </>

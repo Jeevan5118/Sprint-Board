@@ -125,6 +125,23 @@ Default frontend URL:
 
 Backend API base URL in frontend:
 - `frontend/src/services/api.js` (currently points to `http://localhost:5001/api`)
+  - You can override via env: `REACT_APP_API_URL`
+  - Example in `frontend/.env`:
+    - `REACT_APP_API_URL=http://localhost:5001/api`
+
+## Smoke Tests
+
+- Frontend smoke flow:
+```bash
+cd frontend
+npm run test:smoke
+```
+
+- Backend smoke flow:
+```bash
+cd backend
+npm run test:smoke
+```
 
 ## Main API Groups
 

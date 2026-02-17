@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { taskService } from '../../services/taskService';
 import { projectService } from '../../services/projectService';
 import { teamService } from '../../services/teamService';
+import { getErrorMessage } from '../../utils/error';
 
 const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
   const [task, setTask] = useState(null);
@@ -50,7 +51,7 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.response?.data?.message || 'Failed to load task details');
+          setError(getErrorMessage(err, 'Failed to load task details'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -74,6 +75,7 @@ const handleAddComment = async (e) => {
     setCommentText('');
   } catch (err) {
     console.error(err);
+    alert(getErrorMessage(err, 'Failed to add comment'));
   }
 };
 
@@ -84,7 +86,7 @@ const handleDeleteComment = async (commentId) => {
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   } catch (err) {
     console.error(err);
-    alert('Failed to delete comment');
+    alert(getErrorMessage(err, 'Failed to delete comment'));
   }
 };
 
@@ -117,6 +119,7 @@ const handleUpload = async (e) => {
     setTask((prev) => (prev ? { ...prev, attachments } : prev));
   } catch (err) {
     console.error(err);
+    alert(getErrorMessage(err, 'Failed to upload attachment'));
   } finally {
     setUploading(false);
   }
@@ -131,6 +134,7 @@ const handleAddLink = async (e) => {
     setLinkForm({ url: '', title: '', description: '' });
   } catch (err) {
     console.error(err);
+    alert(getErrorMessage(err, 'Failed to add link'));
   }
 };
 
@@ -146,7 +150,7 @@ const handleSaveStoryPoints = async (e) => {
     onTaskUpdated?.(updated);
   } catch (err) {
     console.error(err);
-    alert(err.response?.data?.message || 'Failed to update story points');
+    alert(getErrorMessage(err, 'Failed to update story points'));
   } finally {
     setSavingStoryPoints(false);
   }
@@ -165,6 +169,7 @@ const handleUpdateAssignee = async (userId) => {
     setIsEditingAssignee(false);
   } catch (err) {
     console.error(err);
+    alert(getErrorMessage(err, 'Failed to update assignee'));
   }
 };
 
@@ -175,7 +180,7 @@ const handleDeleteTask = async () => {
     onClose();
   } catch (err) {
     console.error(err);
-    alert('Failed to delete task');
+    alert(getErrorMessage(err, 'Failed to delete task'));
   }
 };
 
