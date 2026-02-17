@@ -18,4 +18,7 @@ router.get('/user', DashboardController.getUserDashboard);
 // Get team dashboard
 router.get('/team/:teamId', DashboardController.getTeamDashboard);
 
+// Get team + project progress report for current user
+router.get('/team-project-progress', DashboardController.getTeamProjectProgress);
+
 module.exports = router;

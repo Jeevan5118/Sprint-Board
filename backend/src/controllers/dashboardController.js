@@ -58,6 +58,18 @@ class DashboardController {
       next(error);
     }
   }
+
+  static async getTeamProjectProgress(req, res, next) {
+    try {
+      const report = await DashboardService.getTeamProjectProgress(req.user);
+      res.status(200).json({
+        success: true,
+        data: report
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = DashboardController;

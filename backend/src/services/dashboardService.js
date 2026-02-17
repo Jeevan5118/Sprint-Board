@@ -123,6 +123,41 @@ class DashboardService {
       }
     };
   }
+
+  static async getTeamProjectProgress(user) {
+    const rows = await Dashboard.getTeamProjectProgress(user);
+    const teamMap = new Map();
+
+    rows.forEach((row) => {
+      if (!teamMap.has(row.team_id)) {
+        teamMap.set(row.team_id, {
+          id: row.team_id,
+          name: row.team_name,
+          projects: []
+        });
+      }
+
+      const totalTasks = row.total_tasks || 0;
+      const completedTasks = row.completed_tasks || 0;
+      const pendingTasks = row.pending_tasks || 0;
+      const progressPercentage =
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      teamMap.get(row.team_id).projects.push({
+        id: row.project_id,
+        name: row.project_name,
+        key_code: row.project_key,
+        total_tasks: totalTasks,
+        completed_tasks: completedTasks,
+        pending_tasks: pendingTasks,
+        progress_percentage: progressPercentage
+      });
+    });
+
+    return {
+      teams: Array.from(teamMap.values())
+    };
+  }
 }
 
 module.exports = DashboardService;
