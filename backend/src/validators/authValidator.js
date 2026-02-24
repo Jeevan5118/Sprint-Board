@@ -5,7 +5,7 @@ const registerValidator = [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('first_name').notEmpty().withMessage('First name is required'),
   body('last_name').notEmpty().withMessage('Last name is required'),
-  body('role').optional().isIn(['admin', 'member']).withMessage('Invalid role')
+  body('role').optional().equals('member').withMessage('Role is fixed to member for self-registration')
 ];
 
 const loginValidator = [

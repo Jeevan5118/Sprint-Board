@@ -1,37 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { teamService } from '../services/teamService';
 
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
-  const [teams, setTeams] = useState([]);
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
     email: '',
-    password: '',
-    role: 'member',
-    team_id: ''
+    password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchTeams = async () => {
-      try {
-        const data = await teamService.getAllTeams();
-        setTeams(data);
-        if (data.length > 0) {
-          setForm(prev => ({ ...prev, team_id: data[0].id }));
-        }
-      } catch (err) {
-        console.error('Failed to fetch teams', err);
-      }
-    };
-    fetchTeams();
-  }, []);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -68,7 +49,7 @@ const Register = () => {
     <div className="auth-page px-4">
       <form className="auth-card max-w-md w-full" onSubmit={handleSubmit}>
         <div className="auth-title">Create your account</div>
-        <div className="auth-subtitle text-[#5E6C84]">Join your team on Scrum Board.</div>
+        <div className="auth-subtitle text-[#5E6C84]">Create your member account on Scrum Board.</div>
 
         {error && <div className="auth-error mb-4">{error}</div>}
 
@@ -130,41 +111,6 @@ const Register = () => {
             onChange={handleChange}
             required
           />
-        </div>
-
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="team_id">
-            Join Team
-          </label>
-          <select
-            id="team_id"
-            name="team_id"
-            className="auth-input"
-            value={form.team_id}
-            onChange={handleChange}
-            required={form.role === 'member'}
-          >
-            <option value="" disabled>Select a team</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="role">
-            Role
-          </label>
-          <select
-            id="role"
-            name="role"
-            className="auth-input"
-            value={form.role}
-            onChange={handleChange}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
         </div>
 
         <button className="auth-button mt-4" type="submit" disabled={loading}>

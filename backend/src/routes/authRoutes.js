@@ -4,10 +4,11 @@ const AuthController = require('../controllers/authController');
 const { registerValidator, loginValidator } = require('../validators/authValidator');
 const validationMiddleware = require('../middlewares/validationMiddleware');
 const { authMiddleware } = require('../middlewares/authMiddleware');
+const { loginRateLimit, registerRateLimit } = require('../middlewares/authRateLimit');
 
 // Public routes
-router.post('/register', registerValidator, validationMiddleware, AuthController.register);
-router.post('/login', loginValidator, validationMiddleware, AuthController.login);
+router.post('/register', registerRateLimit, registerValidator, validationMiddleware, AuthController.register);
+router.post('/login', loginRateLimit, loginValidator, validationMiddleware, AuthController.login);
 
 // Protected routes
 router.get('/profile', authMiddleware, AuthController.getProfile);

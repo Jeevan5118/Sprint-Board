@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { teamService } from '../services/teamService';
-import { authService } from '../services/authService';
 import BackButton from '../components/Common/BackButton';
 import { getErrorMessage } from '../utils/error';
 import useDebouncedValue from '../hooks/useDebouncedValue';
@@ -9,7 +8,7 @@ import useDebouncedValue from '../hooks/useDebouncedValue';
 const Teams = () => {
     const { user } = useAuth();
     const [teams, setTeams] = useState([]);
-    const [allUsers, setAllUsers] = useState([]);
+    const [availableUsers, setAvailableUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
@@ -21,6 +20,11 @@ const Teams = () => {
     const [loadError, setLoadError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [page, setPage] = useState(1);
+    const [selectedMember, setSelectedMember] = useState(null);
+    const [memberTasksModalOpen, setMemberTasksModalOpen] = useState(false);
+    const [memberTasksLoading, setMemberTasksLoading] = useState(false);
+    const [memberTasksError, setMemberTasksError] = useState('');
+    const [memberTasksData, setMemberTasksData] = useState({ total: 0, status_counts: {}, tasks: [] });
     const PAGE_SIZE = 6;
     const debouncedSearchTerm = useDebouncedValue(searchTerm, 250);
 
@@ -49,14 +53,14 @@ const Teams = () => {
     useEffect(() => {
         fetchTeams();
         if (user?.role === 'admin') {
-            fetchUsers();
+            fetchAvailableMembers();
         }
     }, [user, fetchTeams]);
 
-    const fetchUsers = async () => {
+    const fetchAvailableMembers = async () => {
         try {
-            const users = await authService.getAllUsers();
-            setAllUsers(users);
+            const users = await teamService.getAvailableMembers();
+            setAvailableUsers(users);
         } catch (err) {
             setLoadError(getErrorMessage(err, 'Failed to load users'));
         }
@@ -118,6 +122,7 @@ const Teams = () => {
             await teamService.addMember(teamId, selectedUserId);
             setSelectedUserId('');
             setAddingMemberTo(null);
+            await fetchAvailableMembers();
             // Refresh members
             const teamData = await teamService.getTeamById(teamId);
             setExpandedTeams(prev => ({
@@ -133,6 +138,7 @@ const Teams = () => {
         if (!window.confirm('Remove this member from the team?')) return;
         try {
             await teamService.removeMember(teamId, userId);
+            await fetchAvailableMembers();
             // Refresh members
             const teamData = await teamService.getTeamById(teamId);
             setExpandedTeams(prev => ({
@@ -141,6 +147,23 @@ const Teams = () => {
             }));
         } catch (err) {
             alert(getErrorMessage(err, 'Failed to remove member'));
+        }
+    };
+
+    const handleOpenMemberTasks = async (team, member) => {
+        setSelectedMember({ ...member, teamId: team.id, teamName: team.name });
+        setMemberTasksModalOpen(true);
+        setMemberTasksLoading(true);
+        setMemberTasksError('');
+        setMemberTasksData({ total: 0, status_counts: {}, tasks: [] });
+
+        try {
+            const report = await teamService.getMemberTasks(team.id, member.id);
+            setMemberTasksData(report);
+        } catch (err) {
+            setMemberTasksError(getErrorMessage(err, 'Failed to load member tasks'));
+        } finally {
+            setMemberTasksLoading(false);
         }
     };
 
@@ -262,8 +285,7 @@ const Teams = () => {
                                                                                         onChange={(e) => setSelectedUserId(e.target.value)}
                                                                                     >
                                                                                         <option value="">Select user...</option>
-                                                                                        {allUsers
-                                                                                            .filter(u => !expandedTeams[team.id].members.some(m => m.id === u.id))
+                                                                                        {availableUsers
                                                                                             .map(u => (
                                                                                                 <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email})</option>
                                                                                             ))
@@ -311,7 +333,12 @@ const Teams = () => {
                                                                 ) : (
                                                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                                         {expandedTeams[team.id].members.map(member => (
-                                                                            <div key={member.id} className="group relative flex items-center justify-between p-3 bg-white rounded-lg border border-[#DFE1E6] shadow-sm hover:shadow-md transition-all duration-300">
+                                                                            <div
+                                                                                key={member.id}
+                                                                                className="group relative flex items-center justify-between p-3 bg-white rounded-lg border border-[#DFE1E6] shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                                                                                onClick={() => handleOpenMemberTasks(team, member)}
+                                                                                title="Click to view assigned tasks"
+                                                                            >
                                                                                 <div className="flex items-center gap-3">
                                                                                     <div className="w-10 h-10 rounded-full bg-[#E6EFFC] text-[#0052CC] flex items-center justify-center text-xs font-bold uppercase shadow-inner">
                                                                                         {member.first_name ? member.first_name[0] : 'U'}{member.last_name ? member.last_name[0] : ''}
@@ -323,7 +350,10 @@ const Teams = () => {
                                                                                 </div>
                                                                                 {user?.role === 'admin' && (
                                                                                     <button
-                                                                                        onClick={() => handleRemoveMember(team.id, member.id)}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleRemoveMember(team.id, member.id);
+                                                                                        }}
                                                                                         className="opacity-0 group-hover:opacity-100 text-[#DE350B] hover:bg-[#FFEBE6] p-1.5 rounded-md transition-all"
                                                                                         title="Remove from team"
                                                                                     >
@@ -366,6 +396,108 @@ const Teams = () => {
                             </div>
                         )}
                     </>
+                )}
+
+                {memberTasksModalOpen && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-[#091E42] bg-opacity-50 backdrop-blur-sm p-4"
+                        onClick={() => setMemberTasksModalOpen(false)}
+                    >
+                        <div
+                            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-6 py-4 border-b border-[#DFE1E6] flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-bold text-[#172B4D]">
+                                        {selectedMember?.first_name} {selectedMember?.last_name} - Assigned Tasks
+                                    </h2>
+                                    <p className="text-xs text-[#5E6C84] mt-1">
+                                        Team: {selectedMember?.teamName || '-'} | Total Assigned: {memberTasksData.total || 0}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="text-[#42526E] hover:bg-[#EBECF0] p-1 rounded text-2xl leading-none"
+                                    onClick={() => setMemberTasksModalOpen(false)}
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto max-h-[70vh]">
+                                {memberTasksLoading && (
+                                    <div className="text-sm text-[#5E6C84]">Loading assigned tasks...</div>
+                                )}
+                                {memberTasksError && (
+                                    <div className="mb-4 p-3 bg-[#FFEBE6] text-[#DE350B] text-sm rounded-[3px]">{memberTasksError}</div>
+                                )}
+                                {!memberTasksLoading && !memberTasksError && (
+                                    <>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                                            <div className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3">
+                                                <div className="text-xs text-[#6B778C] uppercase">To Do</div>
+                                                <div className="text-xl font-bold text-[#172B4D]">{memberTasksData.status_counts?.todo || 0}</div>
+                                            </div>
+                                            <div className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3">
+                                                <div className="text-xs text-[#6B778C] uppercase">In Progress</div>
+                                                <div className="text-xl font-bold text-[#172B4D]">{memberTasksData.status_counts?.in_progress || 0}</div>
+                                            </div>
+                                            <div className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3">
+                                                <div className="text-xs text-[#6B778C] uppercase">In Review</div>
+                                                <div className="text-xl font-bold text-[#172B4D]">{memberTasksData.status_counts?.in_review || 0}</div>
+                                            </div>
+                                            <div className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3">
+                                                <div className="text-xs text-[#6B778C] uppercase">Done</div>
+                                                <div className="text-xl font-bold text-[#172B4D]">{memberTasksData.status_counts?.done || 0}</div>
+                                            </div>
+                                        </div>
+
+                                        {memberTasksData.tasks?.length === 0 ? (
+                                            <div className="text-sm text-[#5E6C84]">No assigned tasks found for this member in this team.</div>
+                                        ) : (
+                                            <div className="overflow-x-auto border border-[#DFE1E6] rounded-md">
+                                                <table className="min-w-full text-sm">
+                                                    <thead className="bg-[#FAFBFC]">
+                                                        <tr className="text-left text-[#6B778C] text-xs uppercase">
+                                                            <th className="px-3 py-2">Task</th>
+                                                            <th className="px-3 py-2">Project</th>
+                                                            <th className="px-3 py-2">Sprint</th>
+                                                            <th className="px-3 py-2">Status</th>
+                                                            <th className="px-3 py-2">Points</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {memberTasksData.tasks.map((task) => (
+                                                            <tr key={task.id} className="border-t border-[#DFE1E6]">
+                                                                <td className="px-3 py-2 text-[#172B4D] font-medium">
+                                                                    {task.task_key} - {task.title}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-[#172B4D]">
+                                                                    {task.project_key} - {task.project_name}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-[#172B4D]">
+                                                                    {task.sprint_name || 'Backlog'}
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <span className="px-2 py-1 rounded-full bg-[#EBECF0] text-[#42526E] text-xs font-semibold uppercase">
+                                                                        {task.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-3 py-2 text-[#172B4D]">
+                                                                    {task.story_points ?? '-'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {showModal && (

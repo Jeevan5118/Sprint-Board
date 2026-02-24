@@ -78,6 +78,17 @@ const Sidebar = () => {
           </NavLink>
 
           <NavLink
+            to="/timeline"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mb-1 ${isActive ? 'bg-[#E6EFFC] text-[#0052CC]' : 'text-[#42526E] hover:bg-[#F4F5F7]'
+              }`
+            }
+          >
+            <span className="text-lg">📅</span>
+            <span>Timeline</span>
+          </NavLink>
+
+          <NavLink
             to="/teams"
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mb-10 ${isActive ? 'bg-[#E6EFFC] text-[#0052CC]' : 'text-[#42526E] hover:bg-[#F4F5F7]'

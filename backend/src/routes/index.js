@@ -7,6 +7,7 @@ const sprintRoutes = require('./sprintRoutes');
 const taskRoutes = require('./taskRoutes');
 const commentRoutes = require('./commentRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
+const notificationRoutes = require('./notificationRoutes');
 
 // Health check route
 router.get('/health', (req, res) => {
@@ -18,24 +19,27 @@ router.get('/health', (req, res) => {
 });
 
 // Auth routes
-router.use('/auth', (req, res, next) => { console.log('[Route] HIT: /auth'); next(); }, authRoutes);
+router.use('/auth', authRoutes);
 
 // Team routes (Admin only)
-router.use('/teams', (req, res, next) => { console.log('[Route] HIT: /teams'); next(); }, teamRoutes);
+router.use('/teams', teamRoutes);
 
 // Project routes (Team-based access)
-router.use('/projects', (req, res, next) => { console.log('[Route] HIT: /projects'); next(); }, projectRoutes);
+router.use('/projects', projectRoutes);
 
 // Sprint routes (Team-based access)
-router.use('/sprints', (req, res, next) => { console.log('[Route] HIT: /sprints'); next(); }, sprintRoutes);
+router.use('/sprints', sprintRoutes);
 
 // Task routes (Team-based access)
-router.use('/tasks', (req, res, next) => { console.log('[Route] HIT: /tasks'); next(); }, taskRoutes);
+router.use('/tasks', taskRoutes);
 
 // Comment routes (Team-based access)
-router.use('/comments', (req, res, next) => { console.log('[Route] HIT: /comments'); next(); }, commentRoutes);
+router.use('/comments', commentRoutes);
 
 // Dashboard routes (Team-based access)
-router.use('/dashboard', (req, res, next) => { console.log('[Route] HIT: /dashboard'); next(); }, dashboardRoutes);
+router.use('/dashboard', dashboardRoutes);
+
+// Notification routes
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

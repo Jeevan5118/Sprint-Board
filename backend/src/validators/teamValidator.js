@@ -16,4 +16,9 @@ const removeMemberValidator = [
   param('userId').isInt().withMessage('User ID must be a number')
 ];
 
-module.exports = { createTeamValidator, addMemberValidator, removeMemberValidator };
+const memberTasksValidator = [
+  param('id').isInt().withMessage('Team ID must be a number'),
+  param('userId').isInt().withMessage('User ID must be a number')
+];
+
+module.exports = { createTeamValidator, addMemberValidator, removeMemberValidator, memberTasksValidator };

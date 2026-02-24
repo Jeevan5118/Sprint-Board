@@ -18,8 +18,19 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
   const [error, setError] = useState('');
   const [teamMembers, setTeamMembers] = useState([]);
   const [isEditingAssignee, setIsEditingAssignee] = useState(false);
+  const [isEditingIssue, setIsEditingIssue] = useState(false);
+  const [savingIssue, setSavingIssue] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    type: 'task',
+    priority: 'medium',
+    status: 'todo',
+    due_date: ''
+  });
   const { projectId } = useParams();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (!taskId) return;
@@ -39,9 +50,18 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
         setTask(taskData);
         setComments(taskComments);
         setStoryPoints(taskData.story_points ?? '');
+        setEditForm({
+          title: taskData.title || '',
+          description: taskData.description || '',
+          type: taskData.type || 'task',
+          priority: taskData.priority || 'medium',
+          status: taskData.status || 'todo',
+          due_date: taskData.due_date ? String(taskData.due_date).slice(0, 10) : ''
+        });
 
-        if (projectId) {
-          const proj = await projectService.getProjectById(projectId);
+        const effectiveProjectId = projectId || taskData.project_id;
+        if (effectiveProjectId) {
+          const proj = await projectService.getProjectById(effectiveProjectId);
           if (proj.team_id) {
             const members = await teamService.getMembers(proj.team_id);
             if (!cancelled) {
@@ -184,6 +204,51 @@ const handleDeleteTask = async () => {
   }
 };
 
+const handleEditChange = (e) => {
+  const { name, value } = e.target;
+  setEditForm((prev) => ({ ...prev, [name]: value }));
+};
+
+const handleSaveIssue = async (e) => {
+  e.preventDefault();
+  if (!editForm.title.trim()) {
+    alert('Title is required.');
+    return;
+  }
+  setSavingIssue(true);
+  try {
+    const payload = {
+      title: editForm.title.trim(),
+      description: editForm.description?.trim() || null,
+      type: editForm.type,
+      priority: editForm.priority,
+      status: editForm.status,
+      due_date: editForm.due_date || null
+    };
+    const updated = await taskService.updateTask(taskId, payload);
+    const merged = {
+      ...task,
+      ...updated
+    };
+    setTask(merged);
+    setEditForm({
+      title: merged.title || '',
+      description: merged.description || '',
+      type: merged.type || 'task',
+      priority: merged.priority || 'medium',
+      status: merged.status || 'todo',
+      due_date: merged.due_date ? String(merged.due_date).slice(0, 10) : ''
+    });
+    onTaskUpdated?.(merged);
+    setIsEditingIssue(false);
+  } catch (err) {
+    console.error(err);
+    alert(getErrorMessage(err, 'Failed to update issue'));
+  } finally {
+    setSavingIssue(false);
+  }
+};
+
 return (
   <div className="drawer-backdrop" onClick={onClose}>
     <aside className="drawer" onClick={(e) => e.stopPropagation()}>
@@ -209,16 +274,112 @@ return (
                 <span className="text-gray-300">•</span>
                 <span className="text-[12px] text-gray-500 font-medium">Updated just now</span>
               </div>
-              <h2 className="text-2xl font-bold text-[#172B4D] leading-tight tracking-tight mb-6">{task.title}</h2>
+              <h2 className="text-2xl font-bold text-[#172B4D] leading-tight tracking-tight mb-2">{task.title}</h2>
             </div>
-            <button type="button" className="p-1 hover:bg-[#EBECF0] rounded-[3px] text-[#42526E] text-2xl leading-none transition-colors" onClick={onClose}>
-              &times;
-            </button>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm font-semibold text-[#0052CC] hover:bg-[#E6EFFC] rounded-[3px] transition-colors"
+                  onClick={() => setIsEditingIssue((prev) => !prev)}
+                >
+                  {isEditingIssue ? 'Cancel Edit' : 'Edit Issue'}
+                </button>
+              )}
+              <button type="button" className="p-1 hover:bg-[#EBECF0] rounded-[3px] text-[#42526E] text-2xl leading-none transition-colors" onClick={onClose}>
+                &times;
+              </button>
+            </div>
           </header>
 
           <div className="flex flex-col lg:flex-row h-full">
             {/* Main Content (Left) */}
             <div className="flex-1 p-6 space-y-8 overflow-y-auto">
+              {isAdmin && isEditingIssue && (
+                <section className="border border-[#DFE1E6] rounded-[3px] bg-[#FAFBFC] p-4">
+                  <h3 className="text-[#172B4D] font-semibold text-[14px] mb-3">Edit Issue</h3>
+                  <form className="space-y-3" onSubmit={handleSaveIssue}>
+                    <input
+                      className="w-full px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                      name="title"
+                      value={editForm.title}
+                      onChange={handleEditChange}
+                      placeholder="Issue title"
+                      required
+                    />
+                    <textarea
+                      className="w-full px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                      name="description"
+                      value={editForm.description}
+                      onChange={handleEditChange}
+                      rows={3}
+                      placeholder="Issue description"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        className="px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                        name="type"
+                        value={editForm.type}
+                        onChange={handleEditChange}
+                      >
+                        <option value="task">Task</option>
+                        <option value="story">Story</option>
+                        <option value="bug">Bug</option>
+                        <option value="epic">Epic</option>
+                      </select>
+                      <select
+                        className="px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                        name="priority"
+                        value={editForm.priority}
+                        onChange={handleEditChange}
+                      >
+                        <option value="lowest">Lowest</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="highest">Highest</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        className="px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                        name="status"
+                        value={editForm.status}
+                        onChange={handleEditChange}
+                      >
+                        <option value="todo">To Do</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="in_review">In Review</option>
+                        <option value="done">Done</option>
+                      </select>
+                      <input
+                        type="date"
+                        className="px-3 py-2 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                        name="due_date"
+                        value={editForm.due_date}
+                        onChange={handleEditChange}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-sm font-semibold text-[#42526E] hover:bg-[#EBECF0] rounded-[3px]"
+                        onClick={() => setIsEditingIssue(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 text-sm font-semibold bg-[#0052CC] text-white rounded-[3px] hover:bg-[#0065FF]"
+                        disabled={savingIssue}
+                      >
+                        {savingIssue ? 'Saving...' : 'Save Issue'}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              )}
+
               <section>
                 <h3 className="text-[#172B4D] font-semibold text-[14px] mb-2">Description</h3>
                 <div className="text-[14px] text-[#172B4D] leading-relaxed whitespace-pre-wrap">
@@ -345,7 +506,7 @@ return (
 
               <div>
                 <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase mb-3">Assignee</h4>
-                {isEditingAssignee ? (
+                {isAdmin && isEditingAssignee ? (
                   <select
                     className="w-full border border-[#DFE1E6] bg-[#FAFBFC] px-3 py-2 rounded-[3px] focus:bg-white focus:border-[#4C9AFF] outline-none text-sm"
                     value={task.assigned_to || ''}
@@ -360,8 +521,10 @@ return (
                   </select>
                 ) : (
                   <div
-                    className="flex items-center gap-2 px-1 py-1 hover:bg-[#EBECF0] transition-colors cursor-pointer rounded-[3px]"
-                    onClick={() => setIsEditingAssignee(true)}
+                    className={`flex items-center gap-2 px-1 py-1 rounded-[3px] ${isAdmin ? 'hover:bg-[#EBECF0] transition-colors cursor-pointer' : ''}`}
+                    onClick={() => {
+                      if (isAdmin) setIsEditingAssignee(true);
+                    }}
                   >
                     <div className="w-6 h-6 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold uppercase">
                       {task.assigned_to_name ? task.assigned_to_name[0] : '👤'}
@@ -401,14 +564,14 @@ return (
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-[#DFE1E6]">
+              {isAdmin && <div className="pt-6 border-t border-[#DFE1E6]">
                 <button
                   onClick={handleDeleteTask}
                   className="w-full text-left px-3 py-2 text-sm font-semibold text-[#DE350B] hover:bg-[#FFEBE6] rounded-[3px] transition-colors flex items-center gap-2"
                 >
                   <span>🗑️</span> Delete Issue
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         </>

@@ -103,6 +103,32 @@ class TeamController {
       next(error);
     }
   }
+
+  static async getTeamMemberAssignedTasks(req, res, next) {
+    try {
+      const { id, userId } = req.params;
+      const report = await TeamService.getTeamMemberAssignedTasks(Number(id), Number(userId), req.user);
+
+      res.status(200).json({
+        success: true,
+        data: report
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAvailableMembers(req, res, next) {
+    try {
+      const members = await TeamService.getAvailableMembers();
+      res.status(200).json({
+        success: true,
+        data: { members }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = TeamController;

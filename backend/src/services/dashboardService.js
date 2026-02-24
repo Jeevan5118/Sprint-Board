@@ -77,7 +77,19 @@ class DashboardService {
   }
 
   static async getUserDashboard(user) {
-    const stats = await Dashboard.getUserStats(user.id);
+    let stats = await Dashboard.getUserStats(user.id);
+    if (user.role !== 'admin') {
+      const teamStats = await Dashboard.getTeamScopeStats(user.id);
+      const hasTeamScopeData = (teamStats?.total_tasks || 0) > 0;
+      if (hasTeamScopeData) {
+        stats = {
+          assigned_tasks: teamStats.total_tasks || 0,
+          completed_tasks: teamStats.completed_tasks || 0,
+          pending_tasks: teamStats.pending_tasks || 0,
+          in_progress_tasks: teamStats.in_progress_tasks || 0
+        };
+      }
+    }
 
     return {
       user: {

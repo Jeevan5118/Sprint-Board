@@ -1,11 +1,10 @@
 const User = require('../models/User');
-const Team = require('../models/Team');
 const { hashPassword, comparePassword } = require('../utils/bcrypt');
 const { generateToken } = require('../utils/jwt');
 
 class AuthService {
   static async register(userData) {
-    const { email, password, first_name, last_name, role, team_id } = userData;
+    const { email, password, first_name, last_name } = userData;
 
     // Check if user exists
     const existingUser = await User.findByEmail(email);
@@ -22,16 +21,11 @@ class AuthService {
       password: hashedPassword,
       first_name,
       last_name,
-      role: role || 'member'
+      role: 'member'
     });
 
     // Get user data
     const user = await User.findById(userId);
-
-    // Add to team if provided
-    if (team_id) {
-      await Team.addMember(team_id, userId);
-    }
 
     // Generate token
     const token = generateToken({ id: user.id, email: user.email, role: user.role });

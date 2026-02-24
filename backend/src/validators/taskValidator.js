@@ -3,10 +3,13 @@ const { body, param } = require('express-validator');
 const createTaskValidator = [
   body('title').notEmpty().withMessage('Task title is required'),
   body('description').optional(),
-  body('task_key').notEmpty().withMessage('Task key is required'),
+  body('task_key')
+    .optional({ nullable: true, checkFalsy: true })
+    .matches(/^[A-Za-z0-9_-]{2,20}$/)
+    .withMessage('Task key must be 2-20 characters and contain only letters, numbers, "_" or "-"'),
   body('project_id').isInt().withMessage('Project ID is required and must be a number'),
-  body('sprint_id').optional().isInt().withMessage('Sprint ID must be a number'),
-  body('assigned_to').optional().isInt().withMessage('Assigned user ID must be a number'),
+  body('sprint_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
+  body('assigned_to').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Assigned user ID must be a number'),
   body('type').optional().isIn(['story', 'bug', 'task', 'epic']).withMessage('Invalid task type'),
   body('priority').optional().isIn(['lowest', 'low', 'medium', 'high', 'highest']).withMessage('Invalid priority'),
   body('story_points').optional().isInt().withMessage('Story points must be a number'),
@@ -17,8 +20,9 @@ const createTaskValidator = [
 const updateTaskValidator = [
   param('id').isInt().withMessage('Task ID must be a number'),
   body('title').optional().notEmpty().withMessage('Task title cannot be empty'),
-  body('sprint_id').optional({ checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
-  body('assigned_to').optional().isInt().withMessage('Assigned user ID must be a number'),
+  body('sprint_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
+  body('status').optional().isIn(['todo', 'in_progress', 'in_review', 'done']).withMessage('Invalid status'),
+  body('assigned_to').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Assigned user ID must be a number'),
   body('type').optional().isIn(['story', 'bug', 'task', 'epic']).withMessage('Invalid task type'),
   body('priority').optional().isIn(['lowest', 'low', 'medium', 'high', 'highest']).withMessage('Invalid priority'),
   body('story_points').optional().isInt().withMessage('Story points must be a number'),

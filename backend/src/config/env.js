@@ -1,5 +1,14 @@
 require('dotenv').config();
 
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET is required. Set it in environment variables.');
+}
+
+if (process.env.NODE_ENV === 'production' && jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be at least 32 characters in production.');
+}
+
 module.exports = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -11,7 +20,7 @@ module.exports = {
     port: process.env.DB_PORT || 3306
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'secret',
+    secret: jwtSecret,
     expire: process.env.JWT_EXPIRE || '7d'
   },
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000'

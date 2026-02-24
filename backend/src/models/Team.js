@@ -37,15 +37,15 @@ class Team {
 
   static async getTeamsByUserId(userId) {
     const [rows] = await db.query(
-      `SELECT t.*,
+      `SELECT DISTINCT t.*,
         CONCAT(u.first_name, ' ', u.last_name) as team_lead_name,
         (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as member_count
-       FROM team_members tm
-       JOIN teams t ON tm.team_id = t.id
+       FROM teams t
        LEFT JOIN users u ON t.team_lead_id = u.id
-       WHERE tm.user_id = ?
+       LEFT JOIN team_members tm ON tm.team_id = t.id
+       WHERE tm.user_id = ? OR t.team_lead_id = ?
        ORDER BY t.created_at DESC`,
-      [userId]
+      [userId, userId]
     );
     return rows;
   }
@@ -80,10 +80,32 @@ class Team {
 
   static async isMemberExists(teamId, userId) {
     const [rows] = await db.query(
-      'SELECT id FROM team_members WHERE team_id = ? AND user_id = ?',
-      [teamId, userId]
+      `SELECT id
+       FROM team_members
+       WHERE team_id = ? AND user_id = ?
+       UNION
+       SELECT t.id
+       FROM teams t
+       WHERE t.id = ? AND t.team_lead_id = ?`,
+      [teamId, userId, teamId, userId]
     );
     return rows.length > 0;
+  }
+
+  static async getUsersNotInAnyTeam() {
+    const [rows] = await db.query(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.avatar_url, u.is_active
+       FROM users u
+       WHERE u.is_active = TRUE
+         AND u.id NOT IN (
+           SELECT tm.user_id FROM team_members tm
+         )
+         AND u.id NOT IN (
+           SELECT t.team_lead_id FROM teams t WHERE t.team_lead_id IS NOT NULL
+         )
+       ORDER BY u.first_name ASC, u.last_name ASC`
+    );
+    return rows;
   }
 }
 

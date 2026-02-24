@@ -1,5 +1,6 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
+const Task = require('../models/Task');
 
 class TeamService {
   static async createTeam(teamData) {
@@ -62,6 +63,49 @@ class TeamService {
     }
 
     return await Team.getTeamMembers(teamId);
+  }
+
+  static async getTeamMemberAssignedTasks(teamId, userId, requester) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    if (requester.role !== 'admin') {
+      const isRequesterMember = await Team.isMemberExists(teamId, requester.id);
+      if (!isRequesterMember) {
+        throw { statusCode: 403, message: 'Access denied. You are not a member of this team.' };
+      }
+    }
+
+    const isTargetMember = await Team.isMemberExists(teamId, userId);
+    if (!isTargetMember) {
+      throw { statusCode: 404, message: 'Requested user is not a member of this team' };
+    }
+
+    const tasks = await Task.getByAssigneeAndTeam(userId, teamId);
+
+    const statusCounts = {
+      todo: 0,
+      in_progress: 0,
+      in_review: 0,
+      done: 0
+    };
+    tasks.forEach((task) => {
+      if (Object.prototype.hasOwnProperty.call(statusCounts, task.status)) {
+        statusCounts[task.status] += 1;
+      }
+    });
+
+    return {
+      total: tasks.length,
+      status_counts: statusCounts,
+      tasks
+    };
+  }
+
+  static async getAvailableMembers() {
+    return await Team.getUsersNotInAnyTeam();
   }
 
   static async addTeamMember(teamId, userId) {

@@ -11,6 +11,7 @@ import SprintBoard from './pages/SprintBoard';
 import Teams from './pages/Teams';
 import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
+import Timeline from './pages/Timeline';
 
 const App = () => {
   return (
@@ -54,6 +55,15 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Projects />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/timeline"
+          element={
+            <ProtectedRoute>
+              <Timeline />
             </ProtectedRoute>
           }
         />

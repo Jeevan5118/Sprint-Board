@@ -6,6 +6,7 @@
 DROP TABLE IF EXISTS task_attachments;
 DROP TABLE IF EXISTS task_links;
 DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS tasks;
 DROP TABLE IF EXISTS sprints;
 DROP TABLE IF EXISTS project_members;
@@ -149,6 +150,24 @@ CREATE TABLE tasks (
     INDEX idx_status (status),
     INDEX idx_priority (priority),
     INDEX idx_task_key (task_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- NOTIFICATIONS TABLE
+-- ============================================
+CREATE TABLE notifications (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    task_id INT NOT NULL,
+    type ENUM('task_assigned') DEFAULT 'task_assigned',
+    message VARCHAR(500) NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    INDEX idx_notifications_user (user_id),
+    INDEX idx_notifications_read (is_read),
+    INDEX idx_notifications_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

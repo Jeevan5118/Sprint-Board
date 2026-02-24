@@ -25,6 +25,7 @@ const SprintBoard = () => {
   const [initialCreateStatus, setInitialCreateStatus] = useState('todo');
   const [actionMessage, setActionMessage] = useState('');
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 220);
 
   const fetchTasks = useCallback(async () => {
@@ -58,54 +59,47 @@ const SprintBoard = () => {
       const query = debouncedSearchTerm.toLowerCase();
       const matchesSearch = t.title.toLowerCase().includes(query) ||
         (t.task_key && t.task_key.toLowerCase().includes(query));
-      const matchesMyIssues = !onlyMyIssues || t.assigned_to === user?.id;
+      const matchesMyIssues =
+        !onlyMyIssues ||
+        (t.assigned_to != null && Number(t.assigned_to) === Number(user?.id));
       return matchesSearch && matchesMyIssues;
     });
   };
 
   const handleDropTask = async (taskId, newStatusKey) => {
     const sourceTask =
-      tasks.find((t) => t.id === taskId) || backlog.find((t) => t.id === taskId);
+      tasks.find((t) => String(t.id) === String(taskId)) ||
+      backlog.find((t) => String(t.id) === String(taskId));
     if (!sourceTask) return;
+    const isSourceInCurrentSprint = String(sourceTask.sprint_id) === String(sprintId);
 
     const isAlreadyInTarget =
       newStatusKey === 'backlog'
-        ? sourceTask.sprint_id === null || sourceTask.sprint_id === undefined
-        : String(sourceTask.sprint_id) === String(sprintId) &&
-          sourceTask.status === newStatusKey;
+        ? !isSourceInCurrentSprint
+        : isSourceInCurrentSprint && sourceTask.status === newStatusKey;
     if (isAlreadyInTarget) return;
 
     try {
-      // Determine if we're moving to backlog or a board column
       const isToBacklog = newStatusKey === 'backlog';
-      const updateData = {
-        status: isToBacklog ? 'todo' : newStatusKey,
-        sprint_id: isToBacklog ? null : Number(sprintId)
-      };
-
-      const updated = await taskService.updateTask(taskId, updateData);
-
       if (isToBacklog) {
-        // Move from tasks to backlog
-        setTasks((prev) => prev.filter((t) => t.id !== taskId));
-        setBacklog((prev) => {
-          const others = prev.filter((t) => t.id !== taskId);
-          return [updated, ...others];
+        await taskService.updateTask(taskId, { status: 'todo', sprint_id: null });
+      } else if (!isSourceInCurrentSprint) {
+        // Backlog -> board: assign to current sprint and set status
+        await taskService.updateTask(taskId, {
+          sprint_id: Number(sprintId),
+          status: newStatusKey
         });
       } else {
-        // Move from backlog to board OR within board
-        setBacklog((prev) => prev.filter((t) => t.id !== taskId));
-        setTasks((prev) => {
-          const others = prev.filter((t) => t.id !== taskId);
-          return [updated, ...others];
-        });
+        // Board -> board: status-only transition
+        await taskService.updateStatus(taskId, newStatusKey);
       }
       setActionMessage('Task moved successfully.');
+      await fetchTasks();
       setTimeout(() => setActionMessage(''), 1600);
     } catch (err) {
       console.error('Failed to update task status/sprint', err);
       alert(getErrorMessage(err, 'Failed to move task'));
-      fetchTasks();
+      await fetchTasks();
     }
   };
 
@@ -153,15 +147,17 @@ const SprintBoard = () => {
             </h1>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => {
-                setInitialCreateStatus('todo');
-                setShowCreateModal(true);
-              }}
-              className="btn-primary"
-            >
-              Create Issue
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setInitialCreateStatus('todo');
+                  setShowCreateModal(true);
+                }}
+                className="btn-primary"
+              >
+                Create Issue
+              </button>
+            )}
           </div>
         </div>
 
@@ -217,6 +213,7 @@ const SprintBoard = () => {
             tasks={filteredBacklog}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
+            canCreate={isAdmin}
             onQuickCreate={() => {
               setInitialCreateStatus('backlog');
               setShowCreateModal(true);
@@ -228,6 +225,7 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'todo')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
+            canCreate={isAdmin}
             onQuickCreate={() => {
               setInitialCreateStatus('todo');
               setShowCreateModal(true);
@@ -239,6 +237,7 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'in_progress')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
+            canCreate={isAdmin}
             onQuickCreate={() => {
               setInitialCreateStatus('in_progress');
               setShowCreateModal(true);
@@ -250,6 +249,7 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'in_review')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
+            canCreate={isAdmin}
             onQuickCreate={() => {
               setInitialCreateStatus('in_review');
               setShowCreateModal(true);
@@ -261,6 +261,7 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'done')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
+            canCreate={isAdmin}
             onQuickCreate={() => {
               setInitialCreateStatus('done');
               setShowCreateModal(true);
@@ -280,7 +281,7 @@ const SprintBoard = () => {
         />
       )}
 
-      {showCreateModal && (
+      {isAdmin && showCreateModal && (
         <CreateTaskModal
           projectId={projectId}
           sprintId={sprintId}

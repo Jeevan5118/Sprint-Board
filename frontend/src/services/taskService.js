@@ -29,7 +29,11 @@ export const taskService = {
   },
 
   updateAssignee: async (taskId, userId) => {
-    const res = await api.patch(`/tasks/${taskId}/assignee`, { assigned_to: userId });
+    const normalizedAssignee =
+      userId === '' || userId === null || userId === undefined
+        ? null
+        : Number(userId);
+    const res = await api.put(`/tasks/${taskId}`, { assigned_to: normalizedAssignee });
     return res.data.data.task;
   },
 

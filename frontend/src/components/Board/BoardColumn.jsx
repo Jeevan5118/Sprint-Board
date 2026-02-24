@@ -1,6 +1,6 @@
 import React from 'react';
 
-const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuickCreate }) => {
+const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuickCreate, canCreate = true }) => {
   const handleDragOver = (e) => {
     e.preventDefault();
   };
@@ -91,13 +91,15 @@ const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuick
             </div>
           </div>
         ))}
-        <button
-          onClick={onQuickCreate}
-          className="flex items-center gap-2 w-full p-2 text-[14px] text-[#5E6C84] hover:bg-[#EBECF0] hover:text-[#172B4D] rounded-[3px] transition-colors mt-2 font-medium group/create"
-        >
-          <span className="text-xl leading-none group-hover/create:text-[#0052CC]">+</span>
-          <span>Create issue</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={onQuickCreate}
+            className="flex items-center gap-2 w-full p-2 text-[14px] text-[#5E6C84] hover:bg-[#EBECF0] hover:text-[#172B4D] rounded-[3px] transition-colors mt-2 font-medium group/create"
+          >
+            <span className="text-xl leading-none group-hover/create:text-[#0052CC]">+</span>
+            <span>Create issue</span>
+          </button>
+        )}
       </div>
     </div>
   );

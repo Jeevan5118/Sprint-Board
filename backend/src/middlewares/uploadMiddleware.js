@@ -19,17 +19,29 @@ const storage = multer.diskStorage({
   }
 });
 
+const allowedMimeByExt = {
+  '.jpg': ['image/jpeg'],
+  '.jpeg': ['image/jpeg'],
+  '.png': ['image/png'],
+  '.gif': ['image/gif'],
+  '.pdf': ['application/pdf'],
+  '.doc': ['application/msword'],
+  '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  '.xls': ['application/vnd.ms-excel'],
+  '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  '.txt': ['text/plain'],
+  '.zip': ['application/zip', 'application/x-zip-compressed', 'multipart/x-zip']
+};
+
 // File filter
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt|zip/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
-
-  if (extname && mimetype) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const allowedMimes = allowedMimeByExt[ext] || [];
+  if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only images, documents, and archives are allowed.'));
+    return;
   }
+  cb(new Error('Invalid file type. Only approved image/document/archive formats are allowed.'));
 };
 
 const upload = multer({

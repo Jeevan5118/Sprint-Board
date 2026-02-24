@@ -61,6 +61,21 @@ class Task {
     return rows;
   }
 
+  static async getByAssigneeAndTeam(userId, teamId) {
+    const [rows] = await db.query(
+      `SELECT t.id, t.task_key, t.title, t.status, t.priority, t.type, t.story_points,
+              t.project_id, p.name as project_name, p.key_code as project_key,
+              t.sprint_id, s.name as sprint_name, t.created_at, t.updated_at
+       FROM tasks t
+       INNER JOIN projects p ON t.project_id = p.id
+       LEFT JOIN sprints s ON t.sprint_id = s.id
+       WHERE t.assigned_to = ? AND p.team_id = ?
+       ORDER BY p.name ASC, t.updated_at DESC`,
+      [userId, teamId]
+    );
+    return rows;
+  }
+
   static async update(id, taskData) {
     const fields = [];
     const values = [];

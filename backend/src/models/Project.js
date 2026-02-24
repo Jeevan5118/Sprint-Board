@@ -54,8 +54,17 @@ class Project {
 
   static async getUserTeams(userId) {
     const [rows] = await db.query(
-      'SELECT team_id FROM team_members WHERE user_id = ?',
-      [userId]
+      `SELECT DISTINCT team_id
+       FROM (
+         SELECT tm.team_id
+         FROM team_members tm
+         WHERE tm.user_id = ?
+         UNION
+         SELECT t.id as team_id
+         FROM teams t
+         WHERE t.team_lead_id = ?
+       ) x`,
+      [userId, userId]
     );
     return rows.map(row => row.team_id);
   }
