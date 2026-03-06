@@ -15,6 +15,7 @@ const ProjectDetails = () => {
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
+    const canManageProject = user?.role === 'admin' || Number(project?.team_lead_id) === Number(user?.id);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -132,7 +133,14 @@ const ProjectDetails = () => {
                             <p className="text-gray-500 max-w-2xl leading-relaxed">{project.description}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                            {user?.role === 'admin' && (
+                            <Link
+                                to={`/projects/${projectId}/kanban`}
+                                className="btn-secondary flex items-center gap-2 hover:border-[#0052CC] hover:text-[#0052CC]"
+                            >
+                                <span>Open Kanban Board</span>
+                                <span className="text-lg">-&gt;</span>
+                            </Link>
+                            {canManageProject && (
                                 <button
                                     onClick={handleDeleteProject}
                                     disabled={isDeleting}
@@ -141,7 +149,7 @@ const ProjectDetails = () => {
                                     {isDeleting ? 'Deleting...' : 'Delete Project'}
                                 </button>
                             )}
-                            {user?.role === 'admin' && (
+                            {canManageProject && (
                                 <button
                                     onClick={() => setShowModal(true)}
                                     className="btn-primary"
@@ -181,6 +189,19 @@ const ProjectDetails = () => {
                     <span className="ml-3 bg-gray-200 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">{sprints.length}</span>
                 </h2>
 
+                <div className="mb-6 rounded-lg border border-[#B3D4FF] bg-[#E6EFFC] p-4 flex items-center justify-between">
+                    <div>
+                        <div className="text-sm font-bold text-[#0052CC]">Kanban Board</div>
+                        <div className="text-sm text-[#172B4D]">Open Kanban view for this project.</div>
+                    </div>
+                    <Link
+                        to={`/projects/${projectId}/kanban`}
+                        className="btn-primary"
+                    >
+                        Open Kanban Board
+                    </Link>
+                </div>
+
                 <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
                     {sprints.length === 0 ? (
                         <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100 border-dashed">
@@ -208,7 +229,7 @@ const ProjectDetails = () => {
                                 </div>
 
                                 <div className="flex gap-3 flex-wrap">
-                                    {user?.role === 'admin' && sprint.status === 'planned' && (
+                                    {canManageProject && sprint.status === 'planned' && (
                                         <button
                                             onClick={() => handleStartSprint(sprint.id)}
                                             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all"
@@ -216,7 +237,7 @@ const ProjectDetails = () => {
                                             Start Sprint
                                         </button>
                                     )}
-                                    {user?.role === 'admin' && sprint.status === 'active' && (
+                                    {canManageProject && sprint.status === 'active' && (
                                         <button
                                             onClick={() => handleCompleteSprint(sprint.id)}
                                             className="px-4 py-2 bg-[#0052CC] hover:bg-[#0065FF] text-white text-sm font-semibold rounded-lg shadow-sm transition-all"

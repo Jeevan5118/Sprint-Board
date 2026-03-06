@@ -75,6 +75,7 @@ CREATE TABLE projects (
     start_date DATE,
     end_date DATE,
     status ENUM('active', 'on_hold', 'completed', 'archived') DEFAULT 'active',
+    board_type ENUM('scrum', 'kanban') NOT NULL DEFAULT 'scrum',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,

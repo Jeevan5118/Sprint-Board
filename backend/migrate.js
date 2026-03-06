@@ -2,6 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./src/config/database');
 
+function splitSqlStatements(sql) {
+  return sql
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => `${part};`);
+}
+
+function isIgnorableMigrationError(err) {
+  // Duplicate table, column, or index - safe to ignore for idempotent reruns.
+  return [1050, 1060, 1061].includes(Number(err?.errno));
+}
+
 async function ensureMigrationsTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -19,10 +32,20 @@ async function getExecutedVersions() {
 
 async function executeMigration(filePath, version) {
   const sql = fs.readFileSync(filePath, 'utf8');
+  const statements = splitSqlStatements(sql);
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query(sql);
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (err) {
+        if (!isIgnorableMigrationError(err)) {
+          throw err;
+        }
+        console.warn(`Skipping non-fatal migration statement in ${version}: ${err.message}`);
+      }
+    }
     await conn.query('INSERT INTO schema_migrations (version) VALUES (?)', [version]);
     await conn.commit();
     console.log(`Applied migration: ${version}`);

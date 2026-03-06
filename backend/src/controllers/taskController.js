@@ -1,12 +1,13 @@
 const TaskService = require('../services/taskService');
+const FileStorageService = require('../services/fileStorageService');
 
 class TaskController {
   static async createTask(req, res, next) {
     try {
-      const { title, description, task_key, sprint_id, project_id, assigned_to, type, priority, story_points, estimated_hours, due_date } = req.body;
+      const { title, description, task_key, sprint_id, project_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date } = req.body;
 
       const task = await TaskService.createTask(
-        { title, description, task_key, sprint_id, project_id, assigned_to, type, priority, story_points, estimated_hours, due_date },
+        { title, description, task_key, sprint_id, project_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date },
         req.user
       );
 
@@ -136,9 +137,11 @@ class TaskController {
         });
       }
 
+      const persistedFile = await FileStorageService.persistUploadedFile(req.file);
+
       const attachmentData = {
         file_name: req.file.originalname,
-        file_path: req.file.path,
+        file_path: persistedFile.filePath,
         file_size: req.file.size,
         file_type: req.file.mimetype
       };
@@ -148,6 +151,21 @@ class TaskController {
       res.status(201).json({
         success: true,
         message: 'Attachment uploaded successfully',
+        data: { attachments }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteTaskAttachment(req, res, next) {
+    try {
+      const { attachmentId } = req.params;
+      const attachments = await TaskService.deleteTaskAttachment(attachmentId, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: 'Attachment deleted successfully',
         data: { attachments }
       });
     } catch (error) {

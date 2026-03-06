@@ -13,6 +13,7 @@ const Dashboard = () => {
   const [progressReport, setProgressReport] = useState(null);
   const [progressReportLoading, setProgressReportLoading] = useState(true);
   const [progressReportError, setProgressReportError] = useState('');
+  const [deadlineAlerts, setDeadlineAlerts] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,13 +23,15 @@ const Dashboard = () => {
       setProgressReportError('');
       setProgressReportLoading(true);
       try {
-        const [userDashboard, teamProjectProgress] = await Promise.all([
+        const [userDashboard, teamProjectProgress, alerts] = await Promise.all([
           dashboardService.getUserDashboard(),
-          dashboardService.getTeamProjectProgress()
+          dashboardService.getTeamProjectProgress(),
+          dashboardService.getDeadlineAlerts()
         ]);
         if (!cancelled) {
           setStats(userDashboard.stats);
           setProgressReport(teamProjectProgress);
+          setDeadlineAlerts(alerts);
         }
       } catch (err) {
         if (!cancelled) {
@@ -50,8 +53,23 @@ const Dashboard = () => {
   const total = stats?.assigned_tasks ?? 0;
   const completed = stats?.completed_tasks ?? 0;
   const pending = stats?.pending_tasks ?? 0;
+  const aggregatedFromReport = (progressReport?.teams || []).reduce(
+    (acc, team) => {
+      (team.projects || []).forEach((project) => {
+        acc.total += Number(project.total_tasks || 0);
+        acc.completed += Number(project.completed_tasks || 0);
+        acc.pending += Number(project.pending_tasks || 0);
+      });
+      return acc;
+    },
+    { total: 0, completed: 0, pending: 0 }
+  );
+  const hasAggregatedReportData = aggregatedFromReport.total > 0;
+  const displayTotal = hasAggregatedReportData ? aggregatedFromReport.total : total;
+  const displayCompleted = hasAggregatedReportData ? aggregatedFromReport.completed : completed;
+  const displayPending = hasAggregatedReportData ? aggregatedFromReport.pending : pending;
   const progress =
-    total > 0 ? Math.round((completed / total) * 100) : 0;
+    displayTotal > 0 ? Math.round((displayCompleted / displayTotal) * 100) : 0;
   const pieStyle = {
     background: `conic-gradient(#36B37E ${progress}%, #FFAB00 ${progress}% 100%)`
   };
@@ -95,7 +113,7 @@ const Dashboard = () => {
               className="card dashboard-card card-hoverable text-left cursor-pointer"
             >
               <div className="dashboard-label">Total tasks</div>
-              <div className="dashboard-value">{total}</div>
+              <div className="dashboard-value">{displayTotal}</div>
             </button>
             <button
               type="button"
@@ -103,7 +121,7 @@ const Dashboard = () => {
               className="card dashboard-card card-hoverable text-left cursor-pointer"
             >
               <div className="dashboard-label">Completed</div>
-              <div className="dashboard-value text-green-600" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>{completed}</div>
+              <div className="dashboard-value text-green-600" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>{displayCompleted}</div>
             </button>
             <button
               type="button"
@@ -111,7 +129,7 @@ const Dashboard = () => {
               className="card dashboard-card card-hoverable text-left cursor-pointer"
             >
               <div className="dashboard-label">Pending</div>
-              <div className="dashboard-value text-orange-500" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>{pending}</div>
+              <div className="dashboard-value text-orange-500" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text' }}>{displayPending}</div>
             </button>
             <button
               type="button"
@@ -121,6 +139,49 @@ const Dashboard = () => {
               <div className="dashboard-label">Progress</div>
               <div className="dashboard-value">{progress}%</div>
             </button>
+          </div>
+
+          <div className="mt-6 card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-[#172B4D]">Deadline Alerts</h2>
+              <Link to="/timeline" className="text-sm text-[#0052CC] hover:underline">
+                View Timeline
+              </Link>
+            </div>
+            {!deadlineAlerts || ((deadlineAlerts.tasks || []).length === 0 && (deadlineAlerts.sprints || []).length === 0) ? (
+              <div className="text-sm text-[#5E6C84]">No upcoming or overdue deadlines.</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Link to="/timeline" className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3 hover:border-[#FF8F73] transition-colors">
+                    <div className="text-xs text-[#6B778C] uppercase">Overdue Tasks</div>
+                    <div className="text-xl font-bold text-[#DE350B]">{deadlineAlerts.summary?.overdue_tasks || 0}</div>
+                  </Link>
+                  <Link to="/timeline" className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3 hover:border-[#FF8F73] transition-colors">
+                    <div className="text-xs text-[#6B778C] uppercase">Upcoming Tasks</div>
+                    <div className="text-xl font-bold text-[#FF8B00]">{deadlineAlerts.summary?.upcoming_tasks || 0}</div>
+                  </Link>
+                  <Link to="/timeline" className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3 hover:border-[#FF8F73] transition-colors">
+                    <div className="text-xs text-[#6B778C] uppercase">Overdue Sprints</div>
+                    <div className="text-xl font-bold text-[#DE350B]">{deadlineAlerts.summary?.overdue_sprints || 0}</div>
+                  </Link>
+                  <Link to="/timeline" className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-md p-3 hover:border-[#FF8F73] transition-colors">
+                    <div className="text-xs text-[#6B778C] uppercase">Upcoming Sprints</div>
+                    <div className="text-xl font-bold text-[#FF8B00]">{deadlineAlerts.summary?.upcoming_sprints || 0}</div>
+                  </Link>
+                </div>
+                {(deadlineAlerts.tasks || []).slice(0, 5).map((task) => (
+                  <Link
+                    key={task.task_id}
+                    to={`/projects/${task.project_id}`}
+                    className="block text-sm border border-[#DFE1E6] rounded-[3px] p-2 bg-[#FAFBFC] hover:border-[#4C9AFF] transition-colors"
+                  >
+                    <span className="font-semibold text-[#172B4D]">{task.task_key} - {task.task_title}</span>
+                    <span className="ml-2 text-[#5E6C84]">{task.alert_label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-8 card">
@@ -157,7 +218,11 @@ const Dashboard = () => {
                               const projProgress = project.progress_percentage || 0;
                               return (
                                 <tr key={project.id} className="border-t border-[#DFE1E6]">
-                                  <td className="py-2 pr-3 font-medium text-[#172B4D]">{project.key_code} - {project.name}</td>
+                                  <td className="py-2 pr-3 font-medium text-[#172B4D]">
+                                    <Link to={`/projects/${project.id}`} className="hover:text-[#0052CC] hover:underline">
+                                      {project.key_code} - {project.name}
+                                    </Link>
+                                  </td>
                                   <td className="py-2 pr-3 text-[#172B4D]">{project.completed_tasks}</td>
                                   <td className="py-2 pr-3 text-[#172B4D]">{project.pending_tasks}</td>
                                   <td className="py-2 pr-3 text-[#172B4D]">{project.total_tasks}</td>
@@ -219,18 +284,18 @@ const Dashboard = () => {
                   <span className="inline-block w-3 h-3 rounded-full bg-[#36B37E]" />
                   Completed
                 </span>
-                <span className="font-semibold text-[#172B4D]">{completed}</span>
+                <span className="font-semibold text-[#172B4D]">{displayCompleted}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-[#172B4D]">
                   <span className="inline-block w-3 h-3 rounded-full bg-[#FFAB00]" />
                   Pending
                 </span>
-                <span className="font-semibold text-[#172B4D]">{pending}</span>
+                <span className="font-semibold text-[#172B4D]">{displayPending}</span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#DFE1E6]">
                 <span className="text-[#5E6C84]">Total Tasks</span>
-                <span className="font-semibold text-[#172B4D]">{total}</span>
+                <span className="font-semibold text-[#172B4D]">{displayTotal}</span>
               </div>
             </div>
 
@@ -311,7 +376,11 @@ const Dashboard = () => {
                                       : project.total_tasks;
                                 return (
                                   <tr key={project.id} className="border-t border-[#DFE1E6]">
-                                    <td className="py-2 pr-3 font-medium text-[#172B4D]">{project.key_code} - {project.name}</td>
+                                    <td className="py-2 pr-3 font-medium text-[#172B4D]">
+                                      <Link to={`/projects/${project.id}`} className="hover:text-[#0052CC] hover:underline">
+                                        {project.key_code} - {project.name}
+                                      </Link>
+                                    </td>
                                     <td className="py-2 pr-3 text-[#172B4D]">{project.completed_tasks}</td>
                                     <td className="py-2 pr-3 text-[#172B4D]">{project.pending_tasks}</td>
                                     <td className="py-2 pr-3 text-[#172B4D]">{project.total_tasks}</td>

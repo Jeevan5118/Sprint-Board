@@ -4,6 +4,13 @@ const Project = require('../models/Project');
 const Team = require('../models/Team');
 
 class DashboardService {
+  static normalizeDeadlineLabel(daysRemaining) {
+    const d = Number(daysRemaining);
+    if (d < 0) return `Overdue by ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'}`;
+    if (d === 0) return 'Due today';
+    if (d === 1) return 'Due tomorrow';
+    return `Due in ${d} days`;
+  }
   static async getSprintDashboard(sprintId, user) {
     // Validate sprint exists and user has access
     const sprint = await Sprint.findById(sprintId);
@@ -168,6 +175,53 @@ class DashboardService {
 
     return {
       teams: Array.from(teamMap.values())
+    };
+  }
+
+  static async getDeadlineAlerts(user, upcomingDays = 3) {
+    const [taskRows, sprintRows] = await Promise.all([
+      Dashboard.getDeadlineAlertTasks(user, upcomingDays),
+      Dashboard.getDeadlineAlertSprints(user, upcomingDays)
+    ]);
+
+    const tasks = taskRows.map((row) => ({
+      task_id: row.task_id,
+      task_key: row.task_key,
+      task_title: row.task_title,
+      project_id: row.project_id,
+      project_name: row.project_name,
+      project_key: row.project_key,
+      sprint_id: row.sprint_id,
+      sprint_name: row.sprint_name,
+      due_date: row.due_date,
+      days_remaining: Number(row.days_remaining),
+      alert_type: Number(row.days_remaining) < 0 ? 'overdue' : 'upcoming',
+      alert_label: this.normalizeDeadlineLabel(row.days_remaining)
+    }));
+
+    const sprints = sprintRows.map((row) => ({
+      sprint_id: row.sprint_id,
+      sprint_name: row.sprint_name,
+      sprint_status: row.sprint_status,
+      project_id: row.project_id,
+      project_name: row.project_name,
+      project_key: row.project_key,
+      end_date: row.end_date,
+      days_remaining: Number(row.days_remaining),
+      alert_type: Number(row.days_remaining) < 0 ? 'overdue' : 'upcoming',
+      alert_label: this.normalizeDeadlineLabel(row.days_remaining)
+    }));
+
+    return {
+      window_days: upcomingDays,
+      summary: {
+        overdue_tasks: tasks.filter((t) => t.alert_type === 'overdue').length,
+        upcoming_tasks: tasks.filter((t) => t.alert_type === 'upcoming').length,
+        overdue_sprints: sprints.filter((s) => s.alert_type === 'overdue').length,
+        upcoming_sprints: sprints.filter((s) => s.alert_type === 'upcoming').length
+      },
+      tasks,
+      sprints
     };
   }
 }

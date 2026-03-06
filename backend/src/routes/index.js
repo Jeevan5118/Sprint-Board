@@ -8,6 +8,10 @@ const taskRoutes = require('./taskRoutes');
 const commentRoutes = require('./commentRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
 const notificationRoutes = require('./notificationRoutes');
+const kanbanRoutes = require('./kanbanRoutes');
+const analyticsRoutes = require('./analyticsRoutes');
+const timeLogRoutes = require('./timeLogRoutes');
+const adminImportRoutes = require('./adminImportRoutes');
 
 // Health check route
 router.get('/health', (req, res) => {
@@ -41,5 +45,17 @@ router.use('/dashboard', dashboardRoutes);
 
 // Notification routes
 router.use('/notifications', notificationRoutes);
+
+// Kanban routes (Team-based access + kanban-only projects)
+router.use('/kanban', kanbanRoutes);
+
+// Analytics routes (Team-based access + kanban-only projects)
+router.use('/analytics', analyticsRoutes);
+
+// Time log routes (Team-based access)
+router.use('/', timeLogRoutes);
+
+// Admin CSV import routes
+router.use('/admin', adminImportRoutes);
 
 module.exports = router;

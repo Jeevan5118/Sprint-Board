@@ -35,5 +35,19 @@ export const authService = {
   getAllUsers: async () => {
     const response = await api.get('/auth/users');
     return response.data.data.users;
+  },
+
+  createUserByAdmin: async (payload) => {
+    const response = await api.post('/auth/users', payload);
+    return response.data.data.user;
+  },
+
+  updateProfile: async (payload) => {
+    const response = await api.patch('/auth/profile', payload);
+    if (response.data.success) {
+      localStorage.setItem('token', response.data.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+    }
+    return response.data;
   }
 };

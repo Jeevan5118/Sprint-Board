@@ -10,6 +10,7 @@ coverage/
 frontend/build/
 
 # Environment files
+.env.e2e
 .env
 .env.*
 backend/.env
@@ -27,6 +28,12 @@ backend/server.out.txt
 backend/server.err.txt
 backend/request_log.txt
 backend/debug-log.txt
+
+# Playwright artifacts
+playwright-report/
+test-results/
+blob-report/
+.env.e2e
 
 # OS/editor files
 .DS_Store

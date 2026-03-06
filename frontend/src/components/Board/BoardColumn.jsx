@@ -1,6 +1,6 @@
 import React from 'react';
 
-const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuickCreate, canCreate = true }) => {
+const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuickCreate, canCreate = true, isTaskLocked = () => false }) => {
   const handleDragOver = (e) => {
     e.preventDefault();
   };
@@ -49,9 +49,15 @@ const BoardColumn = ({ title, statusKey, tasks, onDropTask, onTaskClick, onQuick
         {tasks.map((task) => (
           <div
             key={task.id}
-            className="bg-white p-3 rounded-[3px] shadow-sm mb-2 border border-transparent hover:border-[#4C9AFF] cursor-pointer transition-all active:shadow-md group"
-            draggable
-            onDragStart={(e) => e.dataTransfer.setData('text/plain', String(task.id))}
+            className={`bg-white p-3 rounded-[3px] shadow-sm mb-2 border border-transparent hover:border-[#4C9AFF] cursor-pointer transition-all active:shadow-md group ${isTaskLocked(task.id) ? 'opacity-60 cursor-not-allowed' : ''}`}
+            draggable={!isTaskLocked(task.id)}
+            onDragStart={(e) => {
+              if (isTaskLocked(task.id)) {
+                e.preventDefault();
+                return;
+              }
+              e.dataTransfer.setData('text/plain', String(task.id));
+            }}
             onClick={() => onTaskClick?.(task.id)}
           >
             <div className="text-[14px] text-[#172B4D] mb-3 leading-tight font-normal group-hover:text-[#0052CC]">

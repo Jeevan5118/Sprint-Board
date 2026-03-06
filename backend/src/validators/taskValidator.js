@@ -10,6 +10,7 @@ const createTaskValidator = [
   body('project_id').isInt().withMessage('Project ID is required and must be a number'),
   body('sprint_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
   body('assigned_to').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Assigned user ID must be a number'),
+  body('status').optional().isIn(['todo', 'in_progress', 'in_review', 'done']).withMessage('Invalid status'),
   body('type').optional().isIn(['story', 'bug', 'task', 'epic']).withMessage('Invalid task type'),
   body('priority').optional().isIn(['lowest', 'low', 'medium', 'high', 'highest']).withMessage('Invalid priority'),
   body('story_points').optional().isInt().withMessage('Story points must be a number'),
@@ -39,6 +40,10 @@ const taskIdValidator = [
   param('id').isInt().withMessage('Task ID must be a number')
 ];
 
+const attachmentIdValidator = [
+  param('attachmentId').isInt().withMessage('Attachment ID must be a number')
+];
+
 const projectIdValidator = [
   param('projectId').isInt().withMessage('Project ID must be a number')
 ];
@@ -59,6 +64,7 @@ module.exports = {
   updateTaskValidator,
   updateStatusValidator,
   taskIdValidator,
+  attachmentIdValidator,
   projectIdValidator,
   sprintIdValidator,
   addLinkValidator

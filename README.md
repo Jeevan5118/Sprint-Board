@@ -16,9 +16,10 @@ This project helps teams manage:
 
 ## Core Features
 
-- Authentication with JWT (`admin` and `member` roles)
+- Authentication with JWT (`admin`, `team_lead`, and `member` roles)
 - Team-based access control across projects, sprints, and tasks
 - Sprint board with drag-and-drop task movement
+- Timeline roadmap page with project/sprint planning view (`/timeline`)
 - Task detail drawer with:
   - story points update
   - assignee update
@@ -31,6 +32,8 @@ This project helps teams manage:
 ## Access Rules (Important)
 
 - `admin` can manage teams, projects, and sprint lifecycle actions.
+- Each team has a single `team_lead` (`teams.team_lead_id`).
+- `team_lead` can manage projects, sprints, tasks, comments, and team members for their own team only.
 - `member` can access data only for teams they belong to.
 - `admin` can create, edit, assign, and delete issues on Sprint Board.
 - `member` can move issues (drag/drop), update status/story points, and add comments/links/attachments.
@@ -38,7 +41,50 @@ This project helps teams manage:
 - Members now see only their own teams in Teams screen (`/api/teams/my`).
 - Members can read team members for their own team (`/api/teams/:id/members`), but not other teams.
 
-## Admin vs Member Quick Sheet
+## Current Implemented Features (Verified)
+
+> This section reflects the current behavior implemented in code.
+
+### Platform Features
+- JWT authentication with protected routes and logout/session clearing.
+- Role-based access with `admin`, `team_lead`, and `member`.
+- Team-based data scoping across teams, projects, sprints, tasks, and comments.
+- Sprint board with drag-and-drop task movement across backlog and workflow columns.
+- Timeline roadmap page with project/sprint ranges, filters, and zoom controls.
+- Task detail drawer with full issue editing (role-scoped), assignee management, story points, comments, links, and attachments.
+- Dashboard endpoints and UI for user/team/project/sprint summaries.
+- Assignment notifications with unread list and mark-read/mark-all-read.
+- Validation middleware, centralized error handling, CORS, Helmet, and request logging.
+- MySQL schema + seed + migration support and CI build/authz checks.
+
+### Role Capability Matrix (Current)
+
+| Capability | Admin | Team Lead | Member |
+|---|---|---|---|
+| Login / Logout | Yes | Yes | Yes |
+| Register | No (provisioned) | No | Yes |
+| View Teams | All | Own teams | Own teams |
+| Create Team | Yes | No | No |
+| Set Team Lead (existing team) | Yes | No | No |
+| Add Members | Yes | Yes (own team only) | No |
+| Remove Members | Yes | Yes (own team only) | No |
+| View Projects | All | Team-scoped | Team-scoped |
+| Create Project | Yes | Yes (own team only) | No |
+| Delete Project | Yes | Yes (own team only) | No |
+| Create Sprint | Yes | Yes (own team project only) | No |
+| Start/Complete Sprint | Yes | Yes (own team project only) | No |
+| Open Sprint Board | Yes | Yes (team-scoped) | Yes (team-scoped) |
+| Create Task | Yes | Yes (own team project only) | No |
+| Edit Full Task Fields | Yes | Yes (own team project only) | No |
+| Move Task / Update Status | Yes | Yes | Yes (team-scoped) |
+| Delete Task | Yes | Yes (own team project only) | No |
+| Add Comment / Link / Attachment | Yes | Yes | Yes (team-scoped) |
+| Delete Any Comment | Yes | Yes (own team project only) | No |
+| Delete Own Comment | Yes | Yes | Yes |
+| Access `GET /api/auth/users` | Yes | No | No |
+| Assignment Notifications | Optional | Yes | Yes |
+
+## Admin vs Team Lead vs Member Quick Sheet
 
 ### Admin
 - Login/logout.
@@ -53,6 +99,16 @@ This project helps teams manage:
 - Add comments, delete any comment.
 - Add links and attachments.
 - Access `GET /api/auth/users`.
+
+### Team Lead
+- View only projects/boards in teams they belong to.
+- Manage only teams where they are assigned as `team_lead_id`.
+- Can create/delete projects in their own team.
+- Can create/start/complete sprints in their own team projects.
+- Can create/edit/delete tasks in their own team projects.
+- Can update assignees and full issue fields in their own team projects.
+- Can add/remove members in their own team.
+- Can delete any comment in their own team projects.
 
 ### Member
 - Register/login/logout.
@@ -74,6 +130,7 @@ This project helps teams manage:
 ### Main Navigation (After Login)
 - `Dashboard` (`/`)
 - `Projects` (`/projects`)
+- `Timeline` (`/timeline`)
 - `Teams` (`/teams`)
 - `Sprint Board` (`/projects/:projectId/sprints/:sprintId/board`)
 
@@ -83,6 +140,17 @@ This project helps teams manage:
 3. User is redirected to `Dashboard`.
 4. All protected routes require valid login.
 5. On logout, token/user are cleared and user returns to login.
+
+### Timeline Module (`/timeline`)
+- Jira-style roadmap view across projects and their sprints.
+- Uses existing project/sprint APIs and team-based access control.
+- Shows project rows with sprint bars plotted by start/end dates.
+- Supports:
+  - search (project/sprint)
+  - project filter
+  - sprint status filter (`planned`, `active`, `completed`, `cancelled`)
+  - zoom levels (`week`, `month`, `quarter`)
+  - current-day marker for execution context
 
 ## Role-Based Capabilities
 
@@ -116,6 +184,33 @@ This project helps teams manage:
 - Upload attachments.
 - Delete issue.
 
+### Team Lead End-to-End Flow
+1. Login -> Dashboard.
+2. `Teams`:
+- View own teams.
+- Manage members only in teams where user is assigned as `team_lead_id`.
+3. `Projects`:
+- View team-scoped projects.
+- Create project only for own team.
+- Delete project only for own team.
+4. `Project Details`:
+- Create sprint in own team projects.
+- Start/complete sprint in own team projects.
+- Open sprint board.
+5. `Sprint Board`:
+- Create issue.
+- Drag/drop tasks and move between backlog/workflow.
+- Open issue details.
+6. `Issue Details`:
+- Edit full issue fields in own team projects.
+- Change assignee.
+- Update story points.
+- Add/delete comments.
+- Add links and upload attachments.
+- Delete issue.
+7. `Timeline`:
+- View roadmap timeline for team-scoped projects and sprints.
+
 ### Member End-to-End Flow
 1. Register/Login -> Dashboard.
 2. `Teams`:
@@ -144,33 +239,40 @@ This project helps teams manage:
 
 ### Capability Matrix
 
-| Category | Admin | Member |
-|---|---|---|
-| Login/Logout | Yes | Yes |
-| Register | No (admin is provisioned) | Yes (member only) |
-| Dashboard | Yes | Yes |
-| View teams | All teams | Own teams only |
-| Create team | Yes | No |
-| Add/remove team members | Yes | No |
-| View projects | All projects | Team-based only |
-| Create/delete project | Yes | No |
-| View project details | Yes | Yes (team-based) |
-| Create sprint | Yes | No (UI hidden) |
-| Start/complete sprint | Yes | No (UI hidden) |
-| Open sprint board | Yes | Yes (team-based) |
-| Create tasks | Yes | No |
-| Update tasks | Yes | Limited (`status`, `story_points`, sprint movement) |
-| Delete tasks | Yes | No |
-| Move task status (drag/drop) | Yes | Yes |
-| Assign/reassign task | Yes | No |
-| Add comments | Yes | Yes |
-| Delete comments | Any comment | Own comments only |
-| Add links/attachments | Yes | Yes |
-| Assignment notifications | Not shown | Shown in navbar |
+| Category | Admin | Team Lead | Member |
+|---|---|---|---|
+| Login/Logout | Yes | Yes | Yes |
+| Register | No (admin is provisioned) | No | Yes (member only) |
+| Dashboard | Yes | Yes | Yes |
+| View teams | All teams | Own teams | Own teams only |
+| Create team | Yes | No | No |
+| Set team lead (existing team) | Yes | No | No |
+| Add members | Yes | Yes (own team only) | No |
+| Remove members | Yes | Yes (own team only) | No |
+| View projects | All projects | Team-scoped | Team-scoped |
+| Create/delete project | Yes | Yes (own team only) | No |
+| View project details | Yes | Yes (team-scoped) | Yes (team-scoped) |
+| Create sprint | Yes | Yes (own team projects) | No |
+| Start/complete sprint | Yes | Yes (own team projects) | No |
+| Open sprint board | Yes | Yes (team-scoped) | Yes (team-scoped) |
+| Create tasks | Yes | Yes (own team projects) | No |
+| Update tasks | Yes (full) | Yes (full in own team projects) | Limited (`status`, `story_points`, sprint movement) |
+| Delete tasks | Yes | Yes (own team projects) | No |
+| Move task status (drag/drop) | Yes | Yes | Yes |
+| Assign/reassign task | Yes | Yes (own team projects) | No |
+| Add comments | Yes | Yes | Yes |
+| Delete comments | Any comment | Any comment (own team projects) | Own comments only |
+| Add links/attachments | Yes | Yes | Yes |
+| Timeline access (`/timeline`) | Yes | Yes (team-scoped) | Yes (team-scoped) |
+| Assignment notifications | Optional | Shown in navbar | Shown in navbar |
 
 ## Complete Functionalities (Detailed, With Duplicates Kept Intentionally)
 
-> Note: This section intentionally repeats overlapping capabilities in both Admin and Member lists (as requested).
+> Note: This section contains detailed legacy breakdowns and may duplicate items.
+> The canonical up-to-date capability list is in:
+> - `Current Implemented Features (Verified)`
+> - `Role Capability Matrix (Current)`
+> - `Capability Matrix` (above)
 
 ### 1. Authentication Module
 

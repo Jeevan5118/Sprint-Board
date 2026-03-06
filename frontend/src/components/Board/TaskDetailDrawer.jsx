@@ -9,14 +9,19 @@ import { getErrorMessage } from '../../utils/error';
 const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
   const [task, setTask] = useState(null);
   const [comments, setComments] = useState([]);
+  const [timeLogs, setTimeLogs] = useState([]);
   const [commentText, setCommentText] = useState('');
+  const [timeLogForm, setTimeLogForm] = useState({ hours: '', description: '' });
   const [storyPoints, setStoryPoints] = useState('');
   const [linkForm, setLinkForm] = useState({ url: '', title: '', description: '' });
   const [uploading, setUploading] = useState(false);
+  const [savingTimeLog, setSavingTimeLog] = useState(false);
+  const [deletingTimeLogId, setDeletingTimeLogId] = useState(null);
   const [savingStoryPoints, setSavingStoryPoints] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [teamMembers, setTeamMembers] = useState([]);
+  const [projectInfo, setProjectInfo] = useState(null);
   const [isEditingAssignee, setIsEditingAssignee] = useState(false);
   const [isEditingIssue, setIsEditingIssue] = useState(false);
   const [savingIssue, setSavingIssue] = useState(false);
@@ -30,7 +35,9 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
   });
   const { projectId } = useParams();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const canManageIssue =
+    user?.role === 'admin' ||
+    (user?.role === 'team_lead' && Number(projectInfo?.team_lead_id) === Number(user?.id));
 
   useEffect(() => {
     if (!taskId) return;
@@ -41,14 +48,16 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
       setError('');
 
       try {
-        const [taskData, taskComments] = await Promise.all([
+        const [taskData, taskComments, taskTimeLogs] = await Promise.all([
           taskService.getTaskDetails(taskId),
-          taskService.getComments(taskId)
+          taskService.getComments(taskId),
+          taskService.getTimeLogs(taskId)
         ]);
 
         if (cancelled) return;
         setTask(taskData);
         setComments(taskComments);
+        setTimeLogs(taskTimeLogs || []);
         setStoryPoints(taskData.story_points ?? '');
         setEditForm({
           title: taskData.title || '',
@@ -62,6 +71,9 @@ const TaskDetailDrawer = ({ taskId, onClose, onTaskUpdated }) => {
         const effectiveProjectId = projectId || taskData.project_id;
         if (effectiveProjectId) {
           const proj = await projectService.getProjectById(effectiveProjectId);
+          if (!cancelled) {
+            setProjectInfo(proj);
+          }
           if (proj.team_id) {
             const members = await teamService.getMembers(proj.team_id);
             if (!cancelled) {
@@ -115,21 +127,10 @@ const handleUpload = async (e) => {
   if (!file) return;
 
   // Validation
-  const maxSize = 5 * 1024 * 1024; // 5MB
-  const allowedTypes = [
-    'image/jpeg', 'image/png', 'image/gif',
-    'application/pdf', 'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain'
-  ];
+  const maxSize = 100 * 1024 * 1024; // 100MB
 
   if (file.size > maxSize) {
-    alert('File size exceeds 5MB limit');
-    return;
-  }
-
-  if (!allowedTypes.includes(file.type)) {
-    alert('File type not supported. Please upload images, PDFs, or Word docs.');
+    alert('File size exceeds 100MB limit');
     return;
   }
 
@@ -173,6 +174,56 @@ const handleSaveStoryPoints = async (e) => {
     alert(getErrorMessage(err, 'Failed to update story points'));
   } finally {
     setSavingStoryPoints(false);
+  }
+};
+
+const handleDeleteAttachment = async (attachmentId) => {
+  if (!window.confirm('Delete this attachment?')) return;
+  try {
+    const attachments = await taskService.deleteAttachment(attachmentId);
+    setTask((prev) => (prev ? { ...prev, attachments } : prev));
+  } catch (err) {
+    console.error(err);
+    alert(getErrorMessage(err, 'Failed to delete attachment'));
+  }
+};
+
+const handleAddTimeLog = async (e) => {
+  e.preventDefault();
+  const hours = Number(timeLogForm.hours);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    alert('Hours must be greater than 0');
+    return;
+  }
+
+  setSavingTimeLog(true);
+  try {
+    const created = await taskService.addTimeLog(taskId, {
+      hours,
+      description: timeLogForm.description?.trim() || ''
+    });
+    setTimeLogs((prev) => [created, ...prev]);
+    setTimeLogForm({ hours: '', description: '' });
+  } catch (err) {
+    console.error(err);
+    alert(getErrorMessage(err, 'Failed to add time log'));
+  } finally {
+    setSavingTimeLog(false);
+  }
+};
+
+const handleDeleteTimeLog = async (timeLogId) => {
+  if (!window.confirm('Delete this time log?')) return;
+
+  setDeletingTimeLogId(timeLogId);
+  try {
+    await taskService.deleteTimeLog(timeLogId);
+    setTimeLogs((prev) => prev.filter((log) => Number(log.id) !== Number(timeLogId)));
+  } catch (err) {
+    console.error(err);
+    alert(getErrorMessage(err, 'Failed to delete time log'));
+  } finally {
+    setDeletingTimeLogId(null);
   }
 };
 
@@ -249,6 +300,11 @@ const handleSaveIssue = async (e) => {
   }
 };
 
+const totalLoggedHours = timeLogs.reduce(
+  (sum, log) => sum + Number(log.hours || 0),
+  0
+);
+
 return (
   <div className="drawer-backdrop" onClick={onClose}>
     <aside className="drawer" onClick={(e) => e.stopPropagation()}>
@@ -277,7 +333,7 @@ return (
               <h2 className="text-2xl font-bold text-[#172B4D] leading-tight tracking-tight mb-2">{task.title}</h2>
             </div>
             <div className="flex items-center gap-2">
-              {isAdmin && (
+              {canManageIssue && (
                 <button
                   type="button"
                   className="px-3 py-1.5 text-sm font-semibold text-[#0052CC] hover:bg-[#E6EFFC] rounded-[3px] transition-colors"
@@ -295,7 +351,7 @@ return (
           <div className="flex flex-col lg:flex-row h-full">
             {/* Main Content (Left) */}
             <div className="flex-1 p-6 space-y-8 overflow-y-auto">
-              {isAdmin && isEditingIssue && (
+              {canManageIssue && isEditingIssue && (
                 <section className="border border-[#DFE1E6] rounded-[3px] bg-[#FAFBFC] p-4">
                   <h3 className="text-[#172B4D] font-semibold text-[14px] mb-3">Edit Issue</h3>
                   <form className="space-y-3" onSubmit={handleSaveIssue}>
@@ -395,6 +451,15 @@ return (
                     <div key={att.id} className="group relative border border-[#DFE1E6] rounded-[3px] p-2 bg-white hover:bg-[#F4F5F7] transition-colors w-32 truncate">
                       <div className="text-xs text-[#172B4D] truncate mb-1">{att.file_name}</div>
                       <div className="text-[10px] text-[#5E6C84]">{(att.file_size / 1024).toFixed(1)} KB</div>
+                      {(canManageIssue || Number(att.uploaded_by) === Number(user?.id)) && (
+                        <button
+                          type="button"
+                          className="mt-1 text-[10px] font-semibold text-[#DE350B] hover:underline"
+                          onClick={() => handleDeleteAttachment(att.id)}
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                   ))}
                   <label className="border-2 border-dashed border-[#DFE1E6] rounded-[3px] w-32 font-medium flex flex-col items-center justify-center cursor-pointer hover:bg-[#F4F5F7] transition-colors h-[54px] text-[#5E6C84]">
@@ -443,6 +508,75 @@ return (
 
               {/* Activity / Comments */}
               <section>
+                <h3 className="text-[#172B4D] font-semibold text-[14px] mb-4">Time Tracking</h3>
+
+                <form onSubmit={handleAddTimeLog} className="space-y-2 mb-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0.25"
+                      step="0.25"
+                      className="w-28 px-3 py-1.5 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                      placeholder="Hours"
+                      value={timeLogForm.hours}
+                      onChange={(e) => setTimeLogForm((prev) => ({ ...prev, hours: e.target.value }))}
+                      required
+                    />
+                    <input
+                      className="flex-1 px-3 py-1.5 border-2 border-[#DFE1E6] rounded-[3px] text-sm focus:border-[#4C9AFF] outline-none"
+                      placeholder="What did you work on?"
+                      value={timeLogForm.description}
+                      onChange={(e) => setTimeLogForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                    <button
+                      type="submit"
+                      className="bg-[#0052CC] hover:bg-[#0065FF] text-white px-3 py-1.5 rounded-[3px] text-sm font-semibold shadow-sm disabled:opacity-60"
+                      disabled={savingTimeLog}
+                    >
+                      {savingTimeLog ? 'Adding...' : 'Log'}
+                    </button>
+                  </div>
+                </form>
+
+                <div className="space-y-2">
+                  {timeLogs.length === 0 && (
+                    <div className="text-[12px] text-[#5E6C84]">No time logs yet.</div>
+                  )}
+                  {timeLogs.map((log) => {
+                    const canDeleteTimeLog = Number(user?.id) === Number(log.user_id) || canManageIssue;
+                    return (
+                      <div key={log.id} className="flex items-start justify-between gap-2 p-2 border border-[#DFE1E6] rounded-[3px] bg-white">
+                        <div>
+                          <div className="text-[13px] text-[#172B4D] font-semibold">
+                            {Number(log.hours).toFixed(2)}h
+                            <span className="ml-2 text-[11px] text-[#5E6C84] font-normal">
+                              by {log.user_name || 'User'}
+                            </span>
+                          </div>
+                          {log.description && (
+                            <div className="text-[12px] text-[#42526E] mt-1">{log.description}</div>
+                          )}
+                          <div className="text-[11px] text-[#5E6C84] mt-1">
+                            {new Date(log.logged_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                        {canDeleteTimeLog && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTimeLog(log.id)}
+                            className="text-[11px] font-semibold text-[#DE350B] hover:underline disabled:opacity-50"
+                            disabled={deletingTimeLogId === log.id}
+                          >
+                            {deletingTimeLogId === log.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section>
                 <h3 className="text-[#172B4D] font-semibold text-[14px] mb-4">Activity</h3>
                 <div className="flex gap-3 mb-6">
                   <div className="w-8 h-8 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-xs font-bold shadow-sm">
@@ -476,7 +610,7 @@ return (
                             <span className="text-[13px] font-bold text-[#172B4D]">{c.author_name}</span>
                             <span className="text-[11px] text-[#5E6C84]">{new Date(c.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
                           </div>
-                          {user?.id === c.user_id && (
+                          {(Number(user?.id) === Number(c.user_id) || canManageIssue) && (
                             <button
                               onClick={() => handleDeleteComment(c.id)}
                               className="opacity-0 group-hover:opacity-100 text-[11px] font-semibold text-[#DE350B] hover:underline transition-all"
@@ -506,7 +640,7 @@ return (
 
               <div>
                 <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase mb-3">Assignee</h4>
-                {isAdmin && isEditingAssignee ? (
+                {canManageIssue && isEditingAssignee ? (
                   <select
                     className="w-full border border-[#DFE1E6] bg-[#FAFBFC] px-3 py-2 rounded-[3px] focus:bg-white focus:border-[#4C9AFF] outline-none text-sm"
                     value={task.assigned_to || ''}
@@ -521,9 +655,9 @@ return (
                   </select>
                 ) : (
                   <div
-                    className={`flex items-center gap-2 px-1 py-1 rounded-[3px] ${isAdmin ? 'hover:bg-[#EBECF0] transition-colors cursor-pointer' : ''}`}
+                    className={`flex items-center gap-2 px-1 py-1 rounded-[3px] ${canManageIssue ? 'hover:bg-[#EBECF0] transition-colors cursor-pointer' : ''}`}
                     onClick={() => {
-                      if (isAdmin) setIsEditingAssignee(true);
+                      if (canManageIssue) setIsEditingAssignee(true);
                     }}
                   >
                     <div className="w-6 h-6 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold uppercase">
@@ -532,6 +666,20 @@ return (
                     <span className="text-[14px] text-[#172B4D]">{task.assigned_to_name || 'Unassigned'}</span>
                   </div>
                 )}
+              </div>
+
+              <div>
+                <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase mb-3">Estimated Hours</h4>
+                <div className="text-[14px] text-[#172B4D] font-semibold">
+                  {task.estimated_hours != null ? `${Number(task.estimated_hours).toFixed(2)}h` : '-'}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase mb-3">Total Logged Hours</h4>
+                <div className="text-[14px] text-[#172B4D] font-semibold">
+                  {totalLoggedHours.toFixed(2)}h
+                </div>
               </div>
 
               <div>
@@ -564,7 +712,7 @@ return (
                 </div>
               </div>
 
-              {isAdmin && <div className="pt-6 border-t border-[#DFE1E6]">
+              {canManageIssue && <div className="pt-6 border-t border-[#DFE1E6]">
                 <button
                   onClick={handleDeleteTask}
                   className="w-full text-left px-3 py-2 text-sm font-semibold text-[#DE350B] hover:bg-[#FFEBE6] rounded-[3px] transition-colors flex items-center gap-2"

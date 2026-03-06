@@ -70,6 +70,18 @@ class DashboardController {
       next(error);
     }
   }
+
+  static async getDeadlineAlerts(req, res, next) {
+    try {
+      const alerts = await DashboardService.getDeadlineAlerts(req.user);
+      res.status(200).json({
+        success: true,
+        data: alerts
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = DashboardController;

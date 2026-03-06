@@ -46,7 +46,7 @@ class TeamController {
     try {
       const { id } = req.params;
 
-      const team = await TeamService.getTeamById(id);
+      const team = await TeamService.getTeamById(id, req.user);
 
       res.status(200).json({
         success: true,
@@ -62,7 +62,7 @@ class TeamController {
       const { id } = req.params;
       const { user_id } = req.body;
 
-      const team = await TeamService.addTeamMember(id, user_id);
+      const team = await TeamService.addTeamMember(id, user_id, req.user);
 
       res.status(200).json({
         success: true,
@@ -78,7 +78,7 @@ class TeamController {
     try {
       const { id, userId } = req.params;
 
-      const team = await TeamService.removeTeamMember(id, userId);
+      const team = await TeamService.removeTeamMember(id, userId, req.user);
 
       res.status(200).json({
         success: true,
@@ -120,10 +120,41 @@ class TeamController {
 
   static async getAvailableMembers(req, res, next) {
     try {
-      const members = await TeamService.getAvailableMembers();
+      const members = await TeamService.getAvailableMembers(req.user);
       res.status(200).json({
         success: true,
         data: { members }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setTeamLead(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { user_id } = req.body;
+      const team = await TeamService.setTeamLead(id, user_id, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: 'Team lead updated successfully',
+        data: { team }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeTeamLead(req, res, next) {
+    try {
+      const { id } = req.params;
+      const team = await TeamService.removeTeamLead(id, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: 'Team lead removed successfully',
+        data: { team }
       });
     } catch (error) {
       next(error);

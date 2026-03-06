@@ -21,6 +21,14 @@ export const teamService = {
         const response = await api.delete(`/teams/${teamId}/members/${userId}`);
         return response.data;
     },
+    setTeamLead: async (teamId, userId) => {
+        const response = await api.patch(`/teams/${teamId}/lead`, { user_id: userId });
+        return response.data.data.team;
+    },
+    removeTeamLead: async (teamId) => {
+        const response = await api.delete(`/teams/${teamId}/lead`);
+        return response.data.data.team;
+    },
     getMembers: async (teamId) => {
         const response = await api.get(`/teams/${teamId}/members`);
         return response.data.data.members;

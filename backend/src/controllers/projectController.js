@@ -4,10 +4,18 @@ class ProjectController {
   static async createProject(req, res, next) {
     try {
       const { name, key_code, description, team_id, start_date, end_date } = req.body;
+      const boardType = req.body.board_type || 'scrum';
+
+      if (!['scrum', 'kanban'].includes(boardType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid board_type. Allowed values: scrum, kanban'
+        });
+      }
 
       const project = await ProjectService.createProject(
-        { name, key_code, description, team_id, start_date, end_date },
-        req.user.id
+        { name, key_code, description, team_id, start_date, end_date, board_type: boardType },
+        req.user
       );
 
       res.status(201).json({
@@ -52,7 +60,7 @@ class ProjectController {
     try {
       const { id } = req.params;
 
-      const result = await ProjectService.deleteProject(id);
+      const result = await ProjectService.deleteProject(id, req.user);
 
       res.status(200).json({
         success: true,

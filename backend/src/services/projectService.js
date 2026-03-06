@@ -1,14 +1,20 @@
 const Project = require('../models/Project');
 const Team = require('../models/Team');
+const { isAdmin, canManageTeam } = require('../utils/permissions');
 
 class ProjectService {
-  static async createProject(projectData, userId) {
-    const { name, key_code, description, team_id, start_date, end_date } = projectData;
+  static async createProject(projectData, user) {
+    const { name, key_code, description, team_id, start_date, end_date, board_type } = projectData;
 
     // Validate team exists
     const team = await Team.findById(team_id);
     if (!team) {
       throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    const canManage = await canManageTeam(team_id, user);
+    if (!canManage) {
+      throw { statusCode: 403, message: 'Only admin or the team lead of this team can create projects' };
     }
 
     // Check if key_code already exists
@@ -22,9 +28,10 @@ class ProjectService {
       key_code,
       description,
       team_id,
-      created_by: userId,
+      created_by: user.id,
       start_date,
-      end_date
+      end_date,
+      board_type
     });
 
     return await Project.findById(projectId);
@@ -32,7 +39,7 @@ class ProjectService {
 
   static async getAllProjects(user) {
     // Admin can see all projects
-    if (user.role === 'admin') {
+    if (isAdmin(user)) {
       return await Project.getAll();
     }
 
@@ -53,7 +60,7 @@ class ProjectService {
     }
 
     // Admin can access any project
-    if (user.role === 'admin') {
+    if (isAdmin(user)) {
       return project;
     }
 
@@ -66,10 +73,15 @@ class ProjectService {
     return project;
   }
 
-  static async deleteProject(projectId) {
+  static async deleteProject(projectId, user) {
     const project = await Project.findById(projectId);
     if (!project) {
       throw { statusCode: 404, message: 'Project not found' };
+    }
+
+    const canManage = await canManageTeam(project.team_id, user);
+    if (!canManage) {
+      throw { statusCode: 403, message: 'Only admin or the team lead of this team can delete projects' };
     }
 
     await Project.delete(projectId);

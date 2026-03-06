@@ -6,6 +6,7 @@ const {
   updateTaskValidator,
   updateStatusValidator,
   taskIdValidator,
+  attachmentIdValidator,
   projectIdValidator,
   sprintIdValidator,
   addLinkValidator
@@ -43,5 +44,6 @@ router.post('/:id/links', addLinkValidator, validationMiddleware, TaskController
 
 // Add attachment to task
 router.post('/:id/attachments', taskIdValidator, validationMiddleware, upload.single('file'), TaskController.addTaskAttachment);
+router.delete('/attachments/:attachmentId', attachmentIdValidator, validationMiddleware, TaskController.deleteTaskAttachment);
 
 module.exports = router;

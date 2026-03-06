@@ -1,6 +1,8 @@
 const Comment = require('../models/Comment');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
+const NotificationService = require('./notificationService');
+const { isAdmin, canManageProject } = require('../utils/permissions');
 
 class CommentService {
   static async addComment(taskId, content, user) {
@@ -11,7 +13,7 @@ class CommentService {
     }
 
     const project = await Project.findById(task.project_id);
-    if (user.role !== 'admin') {
+    if (!isAdmin(user)) {
       const userTeams = await Project.getUserTeams(user.id);
       if (!userTeams.includes(project.team_id)) {
         throw { statusCode: 403, message: 'Access denied.' };
@@ -24,6 +26,10 @@ class CommentService {
       content
     });
 
+    if (task.assigned_to && Number(task.assigned_to) !== Number(user.id)) {
+      await NotificationService.notifyTaskCommented(task.assigned_to, task, user);
+    }
+
     return await Comment.findById(commentId);
   }
 
@@ -35,7 +41,7 @@ class CommentService {
     }
 
     const project = await Project.findById(task.project_id);
-    if (user.role !== 'admin') {
+    if (!isAdmin(user)) {
       const userTeams = await Project.getUserTeams(user.id);
       if (!userTeams.includes(project.team_id)) {
         throw { statusCode: 403, message: 'Access denied.' };
@@ -51,9 +57,13 @@ class CommentService {
       throw { statusCode: 404, message: 'Comment not found' };
     }
 
-    // Only comment owner or admin can delete
-    if (user.role !== 'admin' && comment.user_id !== user.id) {
-      throw { statusCode: 403, message: 'You can only delete your own comments' };
+    if (!isAdmin(user) && comment.user_id !== user.id) {
+      const task = await Task.findById(comment.task_id);
+      const project = await Project.findById(task.project_id);
+      const canManage = await canManageProject(project, user);
+      if (!canManage) {
+        throw { statusCode: 403, message: 'You can only delete your own comments' };
+      }
     }
 
     await Comment.delete(commentId);

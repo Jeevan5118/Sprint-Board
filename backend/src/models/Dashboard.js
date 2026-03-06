@@ -138,6 +138,100 @@ class Dashboard {
     const [rows] = await db.query(query, params);
     return rows;
   }
+
+  static async getDeadlineAlertTasks(user, upcomingDays = 3) {
+    let query = `
+      SELECT
+        t.id AS task_id,
+        t.task_key,
+        t.title AS task_title,
+        t.project_id,
+        p.name AS project_name,
+        p.key_code AS project_key,
+        t.sprint_id,
+        s.name AS sprint_name,
+        t.due_date,
+        DATEDIFF(t.due_date, CURDATE()) AS days_remaining
+      FROM tasks t
+      INNER JOIN projects p ON p.id = t.project_id
+      LEFT JOIN sprints s ON s.id = t.sprint_id
+      WHERE t.due_date IS NOT NULL
+        AND (
+          t.due_date < CURDATE()
+          OR t.due_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        )
+    `;
+
+    const params = [upcomingDays];
+    if (user.role !== 'admin') {
+      query += `
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM team_members tm
+            WHERE tm.team_id = p.team_id AND tm.user_id = ?
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM teams tt
+            WHERE tt.id = p.team_id AND tt.team_lead_id = ?
+          )
+        )
+      `;
+      params.push(user.id, user.id);
+    }
+
+    query += ` ORDER BY t.due_date ASC, p.name ASC, t.task_key ASC`;
+
+    const [rows] = await db.query(query, params);
+    return rows;
+  }
+
+  static async getDeadlineAlertSprints(user, upcomingDays = 3) {
+    let query = `
+      SELECT
+        s.id AS sprint_id,
+        s.name AS sprint_name,
+        s.status AS sprint_status,
+        s.project_id,
+        p.name AS project_name,
+        p.key_code AS project_key,
+        s.end_date,
+        DATEDIFF(s.end_date, CURDATE()) AS days_remaining
+      FROM sprints s
+      INNER JOIN projects p ON p.id = s.project_id
+      WHERE s.end_date IS NOT NULL
+        AND s.status IN ('planned', 'active')
+        AND (
+          s.end_date < CURDATE()
+          OR s.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        )
+    `;
+
+    const params = [upcomingDays];
+    if (user.role !== 'admin') {
+      query += `
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM team_members tm
+            WHERE tm.team_id = p.team_id AND tm.user_id = ?
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM teams tt
+            WHERE tt.id = p.team_id AND tt.team_lead_id = ?
+          )
+        )
+      `;
+      params.push(user.id, user.id);
+    }
+
+    query += ` ORDER BY s.end_date ASC, p.name ASC, s.name ASC`;
+
+    const [rows] = await db.query(query, params);
+    return rows;
+  }
 }
 
 module.exports = Dashboard;

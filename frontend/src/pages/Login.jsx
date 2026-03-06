@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -17,7 +17,7 @@ const Login = () => {
     try {
       const res = await login(email, password);
       if (res.success) {
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
       } else {
         setError(res.message || 'Login failed');
       }
@@ -75,10 +75,7 @@ const Login = () => {
         </button>
 
         <div className="auth-footer">
-          Don&apos;t have an account?{' '}
-          <Link className="auth-link" to="/register">
-            Create one
-          </Link>
+          Account creation is managed by admins.
         </div>
       </form>
     </div>

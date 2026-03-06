@@ -78,6 +78,14 @@ class Team {
     return result.affectedRows;
   }
 
+  static async updateTeamLead(teamId, userId) {
+    const [result] = await db.query(
+      'UPDATE teams SET team_lead_id = ? WHERE id = ?',
+      [userId, teamId]
+    );
+    return result.affectedRows;
+  }
+
   static async isMemberExists(teamId, userId) {
     const [rows] = await db.query(
       `SELECT id
@@ -88,6 +96,27 @@ class Team {
        FROM teams t
        WHERE t.id = ? AND t.team_lead_id = ?`,
       [teamId, userId, teamId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  static async isTeamLead(teamId, userId) {
+    const [rows] = await db.query(
+      `SELECT id
+       FROM teams
+       WHERE id = ? AND team_lead_id = ?`,
+      [teamId, userId]
+    );
+    return rows.length > 0;
+  }
+
+  static async hasLedTeams(userId) {
+    const [rows] = await db.query(
+      `SELECT id
+       FROM teams
+       WHERE team_lead_id = ?
+       LIMIT 1`,
+      [userId]
     );
     return rows.length > 0;
   }

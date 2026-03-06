@@ -5,6 +5,7 @@ import { sprintService } from '../../services/sprintService';
 
 const Sidebar = () => {
   const [activeSprintLink, setActiveSprintLink] = useState(null);
+  const [kanbanProjectLink, setKanbanProjectLink] = useState(null);
 
   useEffect(() => {
     const fetchSprintLink = async () => {
@@ -15,6 +16,7 @@ const Sidebar = () => {
         // Search ALL projects for an active sprint
         let fallbackLink = null;
         let firstProjectLink = `/projects/${projects[0].id}`;
+        setKanbanProjectLink(`/projects/${projects[0].id}/kanban`);
 
         for (const project of projects) {
           const sprints = await sprintService.getSprintsByProject(project.id);
@@ -55,7 +57,7 @@ const Sidebar = () => {
           <div className="sidebar-section-label px-3 mb-2 font-bold text-[11px] text-[#6B778C] uppercase tracking-widest">Planning</div>
 
           <NavLink
-            to="/"
+            to="/dashboard"
             end
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mb-1 ${isActive ? 'bg-[#E6EFFC] text-[#0052CC]' : 'text-[#42526E] hover:bg-[#F4F5F7]'
@@ -115,6 +117,24 @@ const Sidebar = () => {
             <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-300 cursor-not-allowed opacity-50">
               <span className="text-lg">📋</span>
               <span>Sprint Board</span>
+            </div>
+          )}
+
+          {kanbanProjectLink ? (
+            <NavLink
+              to={kanbanProjectLink}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mt-1 ${isActive ? 'bg-[#E6EFFC] text-[#0052CC]' : 'text-[#42526E] hover:bg-[#F4F5F7]'
+                }`
+              }
+            >
+              <span className="text-lg">🗂️</span>
+              <span>Kanban Board</span>
+            </NavLink>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-300 cursor-not-allowed opacity-50 mt-1">
+              <span className="text-lg">🗂️</span>
+              <span>Kanban Board</span>
             </div>
           )}
         </nav>

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import BackButton from '../components/Common/BackButton';
 import { projectService } from '../services/projectService';
 import { sprintService } from '../services/sprintService';
+import { dashboardService } from '../services/dashboardService';
 import { getErrorMessage } from '../utils/error';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -49,6 +51,7 @@ const Timeline = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedProject, setSelectedProject] = useState('all');
+  const [deadlineAlerts, setDeadlineAlerts] = useState({ tasks: [], sprints: [], summary: {} });
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +60,10 @@ const Timeline = () => {
       setLoading(true);
       setError('');
       try {
-        const projects = await projectService.getAllProjects();
+        const [projects, alerts] = await Promise.all([
+          projectService.getAllProjects(),
+          dashboardService.getDeadlineAlerts()
+        ]);
         const timelineRows = await Promise.all(
           projects.map(async (project) => {
             const sprints = await sprintService.getSprintsByProject(project.id);
@@ -71,6 +77,7 @@ const Timeline = () => {
         );
         if (!cancelled) {
           setRows(timelineRows);
+          setDeadlineAlerts(alerts || { tasks: [], sprints: [], summary: {} });
         }
       } catch (err) {
         if (!cancelled) {
@@ -153,6 +160,28 @@ const Timeline = () => {
 
   const projectOptions = rows.map((r) => r.project);
 
+  const sprintAlertMap = useMemo(() => {
+    const map = new Map();
+    (deadlineAlerts?.sprints || []).forEach((s) => {
+      map.set(Number(s.sprint_id), s);
+    });
+    return map;
+  }, [deadlineAlerts]);
+
+  const projectTaskAlertMap = useMemo(() => {
+    const map = new Map();
+    (deadlineAlerts?.tasks || []).forEach((t) => {
+      const key = Number(t.project_id);
+      if (!map.has(key)) {
+        map.set(key, { overdue: 0, upcoming: 0 });
+      }
+      const current = map.get(key);
+      if (t.alert_type === 'overdue') current.overdue += 1;
+      else current.upcoming += 1;
+    });
+    return map;
+  }, [deadlineAlerts]);
+
   return (
     <div className="p-6 md:p-8 bg-[#F4F7FA] min-h-screen">
       <div className="max-w-[1400px] mx-auto">
@@ -211,6 +240,23 @@ const Timeline = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-lg border border-[#DFE1E6] bg-white px-4 py-3">
+          <div className="text-xs font-bold uppercase tracking-widest text-[#6B778C] mb-2">
+            Sprint Status Legend
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {Object.entries(statusStyles).map(([status, style]) => (
+              <div key={status} className="inline-flex items-center gap-2 text-xs text-[#42526E]">
+                <span
+                  className="inline-block h-3 w-3 rounded-full border border-[#DFE1E6]"
+                  style={{ backgroundColor: style.bg }}
+                />
+                <span className="uppercase font-semibold">{status}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -288,6 +334,17 @@ const Timeline = () => {
                             {row.project.key_code} - {row.project.name}
                           </div>
                           <div className="text-xs text-[#6B778C]">{row.project.team_name || '-'}</div>
+                          {projectTaskAlertMap.has(Number(row.project.id)) && (
+                            <div className="mt-1 text-[11px]">
+                              <span className="text-[#DE350B] font-semibold">
+                                Overdue: {projectTaskAlertMap.get(Number(row.project.id)).overdue}
+                              </span>
+                              <span className="mx-1 text-[#97A0AF]">|</span>
+                              <span className="text-[#FF8B00] font-semibold">
+                                Upcoming: {projectTaskAlertMap.get(Number(row.project.id)).upcoming}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="relative" style={{ width: timelineWidth, minWidth: timelineWidth, height: 52 }}>
                           {dayTicks.map((_, i) => (
@@ -304,6 +361,7 @@ const Timeline = () => {
                         const startOffset = daysBetween(range.min, sprint.start_date) * dayWidth;
                         const length = Math.max(2, (daysBetween(sprint.start_date, sprint.end_date) + 1) * dayWidth);
                         const style = statusStyles[sprint.status] || { bg: '#42526E', text: '#FFFFFF' };
+                        const sprintLink = `/projects/${row.project.id}/sprints/${sprint.id}/board`;
                         return (
                           <div key={sprint.id} className="flex border-t border-[#EEF1F4]">
                             <div
@@ -311,11 +369,28 @@ const Timeline = () => {
                               style={{ width: LEFT_COL_WIDTH, minWidth: LEFT_COL_WIDTH }}
                             >
                               <div className="truncate">
-                                <div className="font-medium text-[#172B4D] truncate">{sprint.name}</div>
+                                <Link
+                                  to={sprintLink}
+                                  className="font-medium text-[#172B4D] truncate hover:text-[#0052CC] hover:underline"
+                                  title="Open sprint details"
+                                >
+                                  {sprint.name}
+                                </Link>
                                 <div className="text-[11px] text-[#6B778C]">
                                   {new Date(sprint.start_date).toLocaleDateString()} -{' '}
                                   {new Date(sprint.end_date).toLocaleDateString()}
                                 </div>
+                                {sprintAlertMap.has(Number(sprint.id)) && (
+                                  <div
+                                    className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                                      sprintAlertMap.get(Number(sprint.id)).alert_type === 'overdue'
+                                        ? 'bg-[#FFEBE6] text-[#DE350B]'
+                                        : 'bg-[#FFFAE6] text-[#974F0C]'
+                                    }`}
+                                  >
+                                    {sprintAlertMap.get(Number(sprint.id)).alert_label}
+                                  </div>
+                                )}
                               </div>
                               <span className="text-[10px] uppercase font-bold text-[#6B778C]">
                                 {sprint.status}
@@ -329,7 +404,8 @@ const Timeline = () => {
                                   style={{ left: i * dayWidth }}
                                 />
                               ))}
-                              <div
+                              <Link
+                                to={sprintLink}
                                 className="absolute top-1/2 -translate-y-1/2 h-7 rounded-md px-2 text-xs font-semibold flex items-center truncate shadow-sm"
                                 style={{
                                   left: startOffset,
@@ -337,10 +413,10 @@ const Timeline = () => {
                                   backgroundColor: style.bg,
                                   color: style.text
                                 }}
-                                title={`${sprint.name} (${sprint.status})`}
+                                title={`${sprint.name} (${sprint.status}) - Open sprint details`}
                               >
                                 {sprint.name}
-                              </div>
+                              </Link>
                             </div>
                           </div>
                         );

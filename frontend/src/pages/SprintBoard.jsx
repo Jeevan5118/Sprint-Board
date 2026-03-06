@@ -16,6 +16,7 @@ const SprintBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [project, setProject] = useState(null);
   const [sprint, setSprint] = useState(null);
+  const [activeSprint, setActiveSprint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -24,8 +25,11 @@ const SprintBoard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [initialCreateStatus, setInitialCreateStatus] = useState('todo');
   const [actionMessage, setActionMessage] = useState('');
+  const [movingTaskIds, setMovingTaskIds] = useState(new Set());
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const canManageProject = user?.role === 'admin' || Number(project?.team_lead_id) === Number(user?.id);
+  const isSprintCompleted = sprint?.status === 'completed';
+  const canCreateIssue = canManageProject && !isSprintCompleted;
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 220);
 
   const fetchTasks = useCallback(async () => {
@@ -42,7 +46,12 @@ const SprintBoard = () => {
       setBacklog(backlogTasks);
       setProject(projData);
       // Normalize IDs to strings to handle mixed number/string payloads
-      setSprint(sprintsData.find((s) => String(s.id) === String(sprintId)));
+      const currentSprint = sprintsData.find((s) => String(s.id) === String(sprintId));
+      setSprint(currentSprint);
+      const active = sprintsData.find((s) => s.status === 'active');
+      setActiveSprint(
+        active && String(active.id) !== String(currentSprint?.id) ? active : null
+      );
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load tasks'));
     } finally {
@@ -67,6 +76,15 @@ const SprintBoard = () => {
   };
 
   const handleDropTask = async (taskId, newStatusKey) => {
+    if (movingTaskIds.has(taskId)) {
+      return;
+    }
+
+    if (isSprintCompleted) {
+      alert('This sprint is completed. Move tasks in an active sprint.');
+      return;
+    }
+
     const sourceTask =
       tasks.find((t) => String(t.id) === String(taskId)) ||
       backlog.find((t) => String(t.id) === String(taskId));
@@ -80,6 +98,12 @@ const SprintBoard = () => {
     if (isAlreadyInTarget) return;
 
     try {
+      setMovingTaskIds((prev) => {
+        const next = new Set(prev);
+        next.add(taskId);
+        return next;
+      });
+
       const isToBacklog = newStatusKey === 'backlog';
       if (isToBacklog) {
         await taskService.updateTask(taskId, { status: 'todo', sprint_id: null });
@@ -100,6 +124,12 @@ const SprintBoard = () => {
       console.error('Failed to update task status/sprint', err);
       alert(getErrorMessage(err, 'Failed to move task'));
       await fetchTasks();
+    } finally {
+      setMovingTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
     }
   };
 
@@ -128,6 +158,21 @@ const SprintBoard = () => {
   return (
     <div className="flex flex-col h-full bg-[#EBECF0]">
       <div className="px-8 pt-6 pb-2">
+        {isSprintCompleted && (
+          <div className="mb-3 rounded-[3px] border border-[#FFBDAD] bg-[#FFEBE6] px-3 py-2 text-sm text-[#DE350B]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>This sprint is completed and is now read-only.</span>
+              {activeSprint && (
+                <Link
+                  to={`/projects/${projectId}/sprints/${activeSprint.id}/board`}
+                  className="inline-flex items-center rounded-[3px] border border-[#DE350B] px-2.5 py-1 text-xs font-semibold text-[#DE350B] hover:bg-[#FFBDAD]"
+                >
+                  Go to Active Sprint
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
         {actionMessage && (
           <div className="mb-3 rounded-[3px] border border-[#B3DFCC] bg-[#E3FCEF] px-3 py-2 text-sm text-[#006644]">
             {actionMessage}
@@ -147,7 +192,7 @@ const SprintBoard = () => {
             </h1>
           </div>
           <div className="flex gap-3">
-            {isAdmin && (
+            {canCreateIssue && (
               <button
                 onClick={() => {
                   setInitialCreateStatus('todo');
@@ -213,11 +258,12 @@ const SprintBoard = () => {
             tasks={filteredBacklog}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
-            canCreate={isAdmin}
+            canCreate={canCreateIssue}
             onQuickCreate={() => {
               setInitialCreateStatus('backlog');
               setShowCreateModal(true);
             }}
+            isTaskLocked={(taskId) => movingTaskIds.has(taskId)}
           />
           <BoardColumn
             title="To Do"
@@ -225,11 +271,12 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'todo')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
-            canCreate={isAdmin}
+            canCreate={canCreateIssue}
             onQuickCreate={() => {
               setInitialCreateStatus('todo');
               setShowCreateModal(true);
             }}
+            isTaskLocked={(taskId) => movingTaskIds.has(taskId)}
           />
           <BoardColumn
             title="In Progress"
@@ -237,11 +284,12 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'in_progress')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
-            canCreate={isAdmin}
+            canCreate={canCreateIssue}
             onQuickCreate={() => {
               setInitialCreateStatus('in_progress');
               setShowCreateModal(true);
             }}
+            isTaskLocked={(taskId) => movingTaskIds.has(taskId)}
           />
           <BoardColumn
             title="Review"
@@ -249,11 +297,12 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'in_review')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
-            canCreate={isAdmin}
+            canCreate={canCreateIssue}
             onQuickCreate={() => {
               setInitialCreateStatus('in_review');
               setShowCreateModal(true);
             }}
+            isTaskLocked={(taskId) => movingTaskIds.has(taskId)}
           />
           <BoardColumn
             title="Done"
@@ -261,11 +310,12 @@ const SprintBoard = () => {
             tasks={filteredTasks.filter((t) => t.status === 'done')}
             onDropTask={handleDropTask}
             onTaskClick={setSelectedTaskId}
-            canCreate={isAdmin}
+            canCreate={canCreateIssue}
             onQuickCreate={() => {
               setInitialCreateStatus('done');
               setShowCreateModal(true);
             }}
+            isTaskLocked={(taskId) => movingTaskIds.has(taskId)}
           />
         </div>
       </div>
@@ -281,7 +331,7 @@ const SprintBoard = () => {
         />
       )}
 
-      {isAdmin && showCreateModal && (
+      {canCreateIssue && showCreateModal && (
         <CreateTaskModal
           projectId={projectId}
           sprintId={sprintId}

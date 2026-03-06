@@ -3,9 +3,15 @@ const db = require('../config/database');
 class Project {
   static async create(projectData) {
     const { name, key_code, description, team_id, created_by, start_date, end_date } = projectData;
+    const boardType = projectData.board_type || 'scrum';
+
+    if (!['scrum', 'kanban'].includes(boardType)) {
+      throw { statusCode: 400, message: 'Invalid board_type. Allowed values: scrum, kanban' };
+    }
+
     const [result] = await db.query(
-      'INSERT INTO projects (name, key_code, description, team_id, created_by, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, key_code, description, team_id, created_by, start_date, end_date]
+      'INSERT INTO projects (name, key_code, description, team_id, created_by, start_date, end_date, board_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, key_code, description, team_id, created_by, start_date, end_date, boardType]
     );
     return result.insertId;
   }
@@ -14,9 +20,12 @@ class Project {
     const [rows] = await db.query(
       `SELECT p.*, 
         t.name as team_name,
+        t.team_lead_id as team_lead_id,
+        CONCAT(tl.first_name, ' ', tl.last_name) as team_lead_name,
         CONCAT(u.first_name, ' ', u.last_name) as created_by_name
        FROM projects p
        LEFT JOIN teams t ON p.team_id = t.id
+       LEFT JOIN users tl ON t.team_lead_id = tl.id
        LEFT JOIN users u ON p.created_by = u.id
        WHERE p.id = ?`,
       [id]
@@ -28,9 +37,12 @@ class Project {
     const [rows] = await db.query(
       `SELECT p.*, 
         t.name as team_name,
+        t.team_lead_id as team_lead_id,
+        CONCAT(tl.first_name, ' ', tl.last_name) as team_lead_name,
         CONCAT(u.first_name, ' ', u.last_name) as created_by_name
        FROM projects p
        LEFT JOIN teams t ON p.team_id = t.id
+       LEFT JOIN users tl ON t.team_lead_id = tl.id
        LEFT JOIN users u ON p.created_by = u.id
        ORDER BY p.created_at DESC`
     );
@@ -41,9 +53,12 @@ class Project {
     const [rows] = await db.query(
       `SELECT p.*, 
         t.name as team_name,
+        t.team_lead_id as team_lead_id,
+        CONCAT(tl.first_name, ' ', tl.last_name) as team_lead_name,
         CONCAT(u.first_name, ' ', u.last_name) as created_by_name
        FROM projects p
        LEFT JOIN teams t ON p.team_id = t.id
+       LEFT JOIN users tl ON t.team_lead_id = tl.id
        LEFT JOIN users u ON p.created_by = u.id
        WHERE p.team_id = ?
        ORDER BY p.created_at DESC`,

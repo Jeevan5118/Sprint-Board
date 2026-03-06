@@ -38,11 +38,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const refreshUser = () => {
+    const currentUser = authService.getCurrentUser();
+    setUser(currentUser);
+  };
+
   const value = {
     user,
     login,
     register,
     logout,
+    refreshUser,
     loading,
     isAuthenticated: !!user
   };

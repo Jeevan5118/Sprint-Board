@@ -38,6 +38,28 @@ class AuthController {
     }
   }
 
+  static async createUserByAdmin(req, res, next) {
+    try {
+      const { email, password, first_name, last_name, team_id, role } = req.body;
+      const result = await AuthService.createUserByAdmin({
+        email,
+        password,
+        first_name,
+        last_name,
+        team_id,
+        role
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'User account created successfully',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getProfile(req, res, next) {
     try {
       res.status(200).json({
@@ -56,6 +78,25 @@ class AuthController {
       res.status(200).json({
         success: true,
         data: { users }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateProfile(req, res, next) {
+    try {
+      const { email, current_password, new_password } = req.body;
+      const result = await AuthService.updateProfile(req.user.id, {
+        email,
+        current_password,
+        new_password
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Credentials updated successfully',
+        data: result
       });
     } catch (error) {
       next(error);

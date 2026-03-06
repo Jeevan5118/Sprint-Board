@@ -1,7 +1,13 @@
 const config = require('./env');
 
+const envOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
   config.clientUrl,
+  ...envOrigins,
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://localhost:3001',
@@ -10,7 +16,12 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const isAllowedOrigin =
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
+    if (isAllowedOrigin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

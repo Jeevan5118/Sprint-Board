@@ -2,6 +2,12 @@ const db = require('../config/database');
 
 class Notification {
   static tableEnsured = false;
+  static allowedTypes = [
+    'task_assigned',
+    'task_status_changed',
+    'task_commented',
+    'task_time_logged'
+  ];
 
   static async ensureTable() {
     if (this.tableEnsured) return;
@@ -10,7 +16,7 @@ class Notification {
         id INT PRIMARY KEY AUTO_INCREMENT,
         user_id INT NOT NULL,
         task_id INT NOT NULL,
-        type ENUM('task_assigned') DEFAULT 'task_assigned',
+        type ENUM('task_assigned','task_status_changed','task_commented','task_time_logged') DEFAULT 'task_assigned',
         message VARCHAR(500) NOT NULL,
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -21,14 +27,21 @@ class Notification {
         INDEX idx_notifications_created (created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+    // Ensure enum is expanded even if table existed from older schema.
+    await db.query(`
+      ALTER TABLE notifications
+      MODIFY COLUMN type ENUM('task_assigned','task_status_changed','task_commented','task_time_logged')
+      DEFAULT 'task_assigned'
+    `);
     this.tableEnsured = true;
   }
 
-  static async createAssignment({ user_id, task_id, message }) {
+  static async create({ user_id, task_id, type, message }) {
     await this.ensureTable();
+    const notificationType = this.allowedTypes.includes(type) ? type : 'task_assigned';
     const [result] = await db.query(
       'INSERT INTO notifications (user_id, task_id, type, message) VALUES (?, ?, ?, ?)',
-      [user_id, task_id, 'task_assigned', message]
+      [user_id, task_id, notificationType, message]
     );
     return result.insertId;
   }

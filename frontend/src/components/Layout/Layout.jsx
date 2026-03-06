@@ -3,9 +3,12 @@ import { useLocation } from 'react-router-dom';
 
 const Layout = ({ navbar, sidebar, children }) => {
   const location = useLocation();
-  const isAuthRoute = location.pathname === '/login' || location.pathname === '/register';
+  const isFullPagePublicRoute =
+    location.pathname === '/' ||
+    location.pathname === '/login' ||
+    location.pathname === '/register';
 
-  if (isAuthRoute) {
+  if (isFullPagePublicRoute) {
     return <main>{children}</main>;
   }
 

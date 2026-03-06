@@ -70,9 +70,29 @@ export const taskService = {
     return res.data.data.attachments;
   },
 
+  deleteAttachment: async (attachmentId) => {
+    const res = await api.delete(`/tasks/attachments/${attachmentId}`);
+    return res.data.data.attachments;
+  },
+
   addLink: async (taskId, { url, title, description }) => {
     const res = await api.post(`/tasks/${taskId}/links`, { url, title, description });
     return res.data.data.links;
+  },
+
+  getTimeLogs: async (taskId) => {
+    const res = await api.get(`/tasks/${taskId}/time-logs`);
+    return res.data.data.timeLogs;
+  },
+
+  addTimeLog: async (taskId, payload) => {
+    const res = await api.post(`/tasks/${taskId}/time-logs`, payload);
+    return res.data.data.timeLog;
+  },
+
+  deleteTimeLog: async (timeLogId) => {
+    const res = await api.delete(`/time-logs/${timeLogId}`);
+    return res.data;
   },
 
   createTask: async (taskData) => {

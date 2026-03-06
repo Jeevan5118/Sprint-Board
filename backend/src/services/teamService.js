@@ -1,25 +1,28 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
 const Task = require('../models/Task');
+const { isAdmin, canManageTeam } = require('../utils/permissions');
 
 class TeamService {
   static async createTeam(teamData) {
     const { name, description, team_lead_id } = teamData;
 
-    // Validate team lead exists
-    if (team_lead_id) {
-      const teamLead = await User.findById(team_lead_id);
-      if (!teamLead) {
-        throw { statusCode: 404, message: 'Team lead not found' };
-      }
+    if (!team_lead_id) {
+      throw { statusCode: 400, message: 'Team lead is required' };
+    }
+
+    const teamLead = await User.findById(team_lead_id);
+    if (!teamLead) {
+      throw { statusCode: 404, message: 'Team lead not found' };
+    }
+
+    if (teamLead.role === 'member') {
+      await User.updateRole(team_lead_id, 'team_lead');
     }
 
     const teamId = await Team.create({ name, description, team_lead_id });
-    
-    // Add team lead as member
-    if (team_lead_id) {
-      await Team.addMember(teamId, team_lead_id);
-    }
+
+    await Team.addMember(teamId, team_lead_id);
 
     return await Team.findById(teamId);
   }
@@ -39,23 +42,13 @@ class TeamService {
     return teamsWithMembers;
   }
 
-  static async getTeamById(teamId) {
-    const team = await Team.findById(teamId);
-    if (!team) {
-      throw { statusCode: 404, message: 'Team not found' };
-    }
-
-    const members = await Team.getTeamMembers(teamId);
-    return { ...team, members };
-  }
-
   static async getTeamMembers(teamId, requester) {
     const team = await Team.findById(teamId);
     if (!team) {
       throw { statusCode: 404, message: 'Team not found' };
     }
 
-    if (requester.role !== 'admin') {
+    if (!isAdmin(requester)) {
       const isMember = await Team.isMemberExists(teamId, requester.id);
       if (!isMember) {
         throw { statusCode: 403, message: 'Access denied. You are not a member of this team.' };
@@ -71,7 +64,7 @@ class TeamService {
       throw { statusCode: 404, message: 'Team not found' };
     }
 
-    if (requester.role !== 'admin') {
+    if (!isAdmin(requester)) {
       const isRequesterMember = await Team.isMemberExists(teamId, requester.id);
       if (!isRequesterMember) {
         throw { statusCode: 403, message: 'Access denied. You are not a member of this team.' };
@@ -104,14 +97,25 @@ class TeamService {
     };
   }
 
-  static async getAvailableMembers() {
+  static async getAvailableMembers(requester) {
+    if (!isAdmin(requester)) {
+      const isLeadAnywhere = await Team.hasLedTeams(requester.id);
+      if (!isLeadAnywhere) {
+        throw { statusCode: 403, message: 'Access denied. Insufficient permissions.' };
+      }
+    }
     return await Team.getUsersNotInAnyTeam();
   }
 
-  static async addTeamMember(teamId, userId) {
+  static async addTeamMember(teamId, userId, requester) {
     const team = await Team.findById(teamId);
     if (!team) {
       throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    const canManage = await canManageTeam(teamId, requester);
+    if (!canManage) {
+      throw { statusCode: 403, message: 'Only admin or the team lead can manage team members' };
     }
 
     const user = await User.findById(userId);
@@ -131,13 +135,18 @@ class TeamService {
     }
 
     await Team.addMember(teamId, userId);
-    return await this.getTeamById(teamId);
+    return await this.getTeamById(teamId, requester);
   }
 
-  static async removeTeamMember(teamId, userId) {
+  static async removeTeamMember(teamId, userId, requester) {
     const team = await Team.findById(teamId);
     if (!team) {
       throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    const canManage = await canManageTeam(teamId, requester);
+    if (!canManage) {
+      throw { statusCode: 403, message: 'Only admin or the team lead can manage team members' };
     }
 
     const exists = await Team.isMemberExists(teamId, userId);
@@ -146,7 +155,71 @@ class TeamService {
     }
 
     await Team.removeMember(teamId, userId);
-    return await this.getTeamById(teamId);
+    return await this.getTeamById(teamId, requester);
+  }
+
+  static async setTeamLead(teamId, userId, requester) {
+    if (!isAdmin(requester)) {
+      throw { statusCode: 403, message: 'Only admin can assign team lead' };
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      throw { statusCode: 404, message: 'User not found' };
+    }
+
+    const isMember = await Team.isMemberExists(teamId, userId);
+    if (!isMember) {
+      throw { statusCode: 400, message: 'User must be a member of the team to be assigned as team lead' };
+    }
+
+    if (user.role === 'member') {
+      await User.updateRole(userId, 'team_lead');
+    }
+
+    await Team.updateTeamLead(teamId, userId);
+    return await this.getTeamById(teamId, requester);
+  }
+
+  static async removeTeamLead(teamId, requester) {
+    if (!isAdmin(requester)) {
+      throw { statusCode: 403, message: 'Only admin can remove team lead' };
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    await Team.updateTeamLead(teamId, null);
+    return await this.getTeamById(teamId, requester);
+  }
+
+  static async getTeamById(teamId, requester) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    if (!requester) {
+      const members = await Team.getTeamMembers(teamId);
+      return { ...team, members };
+    }
+
+    if (!isAdmin(requester)) {
+      const canManage = await canManageTeam(teamId, requester);
+      if (!canManage) {
+        throw { statusCode: 403, message: 'Access denied. Only admin or team lead can access full team details.' };
+      }
+    }
+
+    const members = await Team.getTeamMembers(teamId);
+    return { ...team, members };
   }
 }
 

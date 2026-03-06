@@ -7,12 +7,15 @@ import useDebouncedValue from '../hooks/useDebouncedValue';
 
 const Teams = () => {
     const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
+    const canManageTeam = (team) => isAdmin || Number(team?.team_lead_id) === Number(user?.id);
     const [teams, setTeams] = useState([]);
     const [availableUsers, setAvailableUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
     const [newTeamDescription, setNewTeamDescription] = useState('');
+    const [newTeamLeadId, setNewTeamLeadId] = useState('');
     const [error, setError] = useState('');
     const [expandedTeams, setExpandedTeams] = useState({}); // { teamId: { members: [], loading: false } }
     const [addingMemberTo, setAddingMemberTo] = useState(null);
@@ -27,11 +30,22 @@ const Teams = () => {
     const [memberTasksData, setMemberTasksData] = useState({ total: 0, status_counts: {}, tasks: [] });
     const PAGE_SIZE = 6;
     const debouncedSearchTerm = useDebouncedValue(searchTerm, 250);
+    const hasTeamLead = (team) =>
+        team?.team_lead_id !== null &&
+        team?.team_lead_id !== undefined &&
+        Number(team.team_lead_id) > 0;
+    const getTeamLeadLabel = (team, members = []) => {
+        if (!hasTeamLead(team)) return 'Not assigned';
+        if (team?.team_lead_name) return team.team_lead_name;
+        const lead = members.find((m) => Number(m.id) === Number(team.team_lead_id));
+        if (!lead) return `User #${team.team_lead_id}`;
+        return `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || `User #${team.team_lead_id}`;
+    };
 
     const fetchTeams = useCallback(async () => {
         setLoadError('');
         try {
-            if (user?.role === 'admin') {
+            if (isAdmin) {
                 const data = await teamService.getAllTeams();
                 setTeams(data);
             } else {
@@ -48,20 +62,23 @@ const Teams = () => {
         } finally {
             setLoading(false);
         }
-    }, [user?.role]);
+    }, [isAdmin]);
 
     useEffect(() => {
         fetchTeams();
-        if (user?.role === 'admin') {
+        if (user) {
             fetchAvailableMembers();
         }
-    }, [user, fetchTeams]);
+    }, [user, fetchTeams, isAdmin]);
 
     const fetchAvailableMembers = async () => {
         try {
             const users = await teamService.getAvailableMembers();
             setAvailableUsers(users);
         } catch (err) {
+            if (err?.response?.status === 403) {
+                return;
+            }
             setLoadError(getErrorMessage(err, 'Failed to load users'));
         }
     };
@@ -74,8 +91,8 @@ const Teams = () => {
             return;
         }
 
-        if (user?.role !== 'admin') {
-            const selectedTeam = teams.find((team) => team.id === teamId);
+        const selectedTeam = teams.find((team) => Number(team.id) === Number(teamId));
+        if (!canManageTeam(selectedTeam)) {
             setExpandedTeams(prev => ({
                 ...prev,
                 [teamId]: { loading: false, members: selectedTeam?.members || [] }
@@ -106,11 +123,17 @@ const Teams = () => {
     const handleCreateTeam = async (e) => {
         e.preventDefault();
         try {
-            await teamService.createTeam({ name: newTeamName, description: newTeamDescription });
+            await teamService.createTeam({
+                name: newTeamName,
+                description: newTeamDescription,
+                team_lead_id: Number(newTeamLeadId)
+            });
             setShowModal(false);
             setNewTeamName('');
             setNewTeamDescription('');
+            setNewTeamLeadId('');
             fetchTeams();
+            await fetchAvailableMembers();
         } catch (err) {
             setError(getErrorMessage(err, 'Failed to create team'));
         }
@@ -134,13 +157,45 @@ const Teams = () => {
         }
     };
 
+    const handleSetTeamLead = async (teamId, userId) => {
+        if (!window.confirm('Set this member as team lead for this team?')) return;
+        try {
+            const updatedTeam = await teamService.setTeamLead(teamId, userId);
+            setTeams((prev) => prev.map((team) => (Number(team.id) === Number(teamId) ? { ...team, ...updatedTeam } : team)));
+            setExpandedTeams((prev) => ({
+                ...prev,
+                [teamId]: { loading: false, members: updatedTeam.members || [] }
+            }));
+        } catch (err) {
+            alert(getErrorMessage(err, 'Failed to set team lead'));
+        }
+    };
+
+    const handleRemoveTeamLead = async (teamId) => {
+        if (!window.confirm('Remove current team lead from this team?')) return;
+        try {
+            const updatedTeam = await teamService.removeTeamLead(teamId);
+            setTeams((prev) => prev.map((team) => (Number(team.id) === Number(teamId) ? { ...team, ...updatedTeam } : team)));
+            setExpandedTeams((prev) => ({
+                ...prev,
+                [teamId]: { loading: false, members: updatedTeam.members || [] }
+            }));
+        } catch (err) {
+            alert(getErrorMessage(err, 'Failed to remove team lead'));
+        }
+    };
+
     const handleRemoveMember = async (teamId, userId) => {
         if (!window.confirm('Remove this member from the team?')) return;
         try {
             await teamService.removeMember(teamId, userId);
             await fetchAvailableMembers();
-            // Refresh members
             const teamData = await teamService.getTeamById(teamId);
+            setTeams((prev) =>
+                prev.map((team) =>
+                    Number(team.id) === Number(teamId) ? { ...team, ...teamData } : team
+                )
+            );
             setExpandedTeams(prev => ({
                 ...prev,
                 [teamId]: { loading: false, members: teamData.members || [] }
@@ -199,7 +254,7 @@ const Teams = () => {
                             placeholder="Search teams"
                             className="border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
                         />
-                    {user?.role === 'admin' && (
+                    {isAdmin && (
                         <button
                             onClick={() => setShowModal(true)}
                             className="btn-primary"
@@ -275,7 +330,14 @@ const Teams = () => {
                                                                     <div className="text-[12px] font-bold text-[#6B778C] uppercase tracking-widest flex items-center gap-2">
                                                                         <span>👥</span> Team Members ({expandedTeams[team.id].members.length})
                                                                     </div>
-                                                                    {user?.role === 'admin' && (
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="px-3 py-1 rounded-md border border-[#DFE1E6] bg-white text-[11px] text-[#42526E]">
+                                                                            <span className="font-bold uppercase text-[#6B778C] mr-2">Current Team Lead</span>
+                                                                            <span className="font-semibold text-[#172B4D] normal-case">
+                                                                                {getTeamLeadLabel(team, expandedTeams[team.id].members || [])}
+                                                                            </span>
+                                                                        </div>
+                                                                    {canManageTeam(team) && (
                                                                         <div className="flex gap-2">
                                                                             {addingMemberTo === team.id ? (
                                                                                 <div className="flex gap-2 animate-fade-in">
@@ -285,11 +347,9 @@ const Teams = () => {
                                                                                         onChange={(e) => setSelectedUserId(e.target.value)}
                                                                                     >
                                                                                         <option value="">Select user...</option>
-                                                                                        {availableUsers
-                                                                                            .map(u => (
-                                                                                                <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email})</option>
-                                                                                            ))
-                                                                                        }
+                                                                                        {availableUsers.map((u) => (
+                                                                                            <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.email})</option>
+                                                                                        ))}
                                                                                     </select>
                                                                                     <button
                                                                                         onClick={() => handleAddMember(team.id)}
@@ -315,6 +375,7 @@ const Teams = () => {
                                                                             )}
                                                                         </div>
                                                                     )}
+                                                                    </div>
                                                                 </div>
 
                                                                 {expandedTeams[team.id].loading ? (
@@ -335,30 +396,57 @@ const Teams = () => {
                                                                         {expandedTeams[team.id].members.map(member => (
                                                                             <div
                                                                                 key={member.id}
-                                                                                className="group relative flex items-center justify-between p-3 bg-white rounded-lg border border-[#DFE1E6] shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                                                                                className="group relative flex items-start justify-between p-4 bg-white rounded-xl border border-[#DFE1E6] shadow-sm hover:shadow-md hover:border-[#B3D4FF] transition-all duration-300 cursor-pointer"
                                                                                 onClick={() => handleOpenMemberTasks(team, member)}
                                                                                 title="Click to view assigned tasks"
                                                                             >
-                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="flex items-center gap-3 min-w-0">
                                                                                     <div className="w-10 h-10 rounded-full bg-[#E6EFFC] text-[#0052CC] flex items-center justify-center text-xs font-bold uppercase shadow-inner">
                                                                                         {member.first_name ? member.first_name[0] : 'U'}{member.last_name ? member.last_name[0] : ''}
                                                                                     </div>
-                                                                                    <div>
+                                                                                    <div className="min-w-0">
                                                                                         <div className="text-[14px] font-bold text-[#172B4D]">{member.first_name} {member.last_name}</div>
-                                                                                        <div className="text-[12px] text-[#5E6C84]">{member.email}</div>
+                                                                                        <div className="text-[12px] text-[#5E6C84] truncate">{member.email}</div>
+                                                                                        <div className="text-[11px] text-[#6B778C] uppercase tracking-wide mt-0.5">{member.role || 'member'}</div>
                                                                                     </div>
                                                                                 </div>
-                                                                                {user?.role === 'admin' && (
-                                                                                    <button
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            handleRemoveMember(team.id, member.id);
-                                                                                        }}
-                                                                                        className="opacity-0 group-hover:opacity-100 text-[#DE350B] hover:bg-[#FFEBE6] p-1.5 rounded-md transition-all"
-                                                                                        title="Remove from team"
-                                                                                    >
-                                                                                        🗑️
-                                                                                    </button>
+                                                                                {canManageTeam(team) && (
+                                                                                    <div className="flex flex-col items-stretch gap-2 min-w-[88px] ml-3">
+                                                                                        {isAdmin && Number(team.team_lead_id) === Number(member.id) && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    handleRemoveTeamLead(team.id);
+                                                                                                }}
+                                                                                                className="w-[88px] px-2 py-1 text-[11px] font-semibold text-[#DE350B] bg-[#FFEBE6] hover:bg-[#FFBDAD] rounded-md transition-colors text-center"
+                                                                                                title="Remove as team lead"
+                                                                                            >
+                                                                                                Remove Lead
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {isAdmin && !hasTeamLead(team) && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    handleSetTeamLead(team.id, member.id);
+                                                                                                }}
+                                                                                                className="w-[88px] px-2 py-1 text-[11px] font-semibold text-[#0052CC] bg-[#E6EFFC] hover:bg-[#B3D4FF] rounded-md transition-colors text-center"
+                                                                                                title="Set as team lead"
+                                                                                            >
+                                                                                                Set Lead
+                                                                                            </button>
+                                                                                        )}
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleRemoveMember(team.id, member.id);
+                                                                                            }}
+                                                                                            className="w-[88px] px-2 py-1 text-[11px] font-semibold text-[#DE350B] bg-[#FFEBE6] hover:bg-[#FFBDAD] rounded-md transition-colors text-center"
+                                                                                            title="Remove from team"
+                                                                                        >
+                                                                                            Remove
+                                                                                        </button>
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         ))}
@@ -535,10 +623,30 @@ const Teams = () => {
                                             rows="4"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-[#5E6C84] mb-2 uppercase tracking-widest">Team Lead</label>
+                                        <select
+                                            value={newTeamLeadId}
+                                            onChange={(e) => setNewTeamLeadId(e.target.value)}
+                                            className="w-full border-2 border-[#DFE1E6] bg-[#FAFBFC] px-4 py-2.5 rounded-lg focus:bg-white focus:border-[#4C9AFF] focus:ring-4 focus:ring-[#E6EFFC] outline-none transition-all text-[15px] font-medium"
+                                            required
+                                        >
+                                            <option value="">Select a team lead</option>
+                                            {availableUsers.map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.first_name} {u.last_name} ({u.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="flex justify-end gap-3 pt-4">
                                         <button
                                             type="button"
-                                            onClick={() => setShowModal(false)}
+                                            onClick={() => {
+                                                setShowModal(false);
+                                                setError('');
+                                                setNewTeamLeadId('');
+                                            }}
                                             className="px-6 py-2.5 text-sm font-bold text-[#42526E] hover:bg-[#EBECF0] rounded-lg transition-colors"
                                         >
                                             Cancel
@@ -561,3 +669,6 @@ const Teams = () => {
 };
 
 export default Teams;
+
+
+

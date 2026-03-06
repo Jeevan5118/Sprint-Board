@@ -25,7 +25,7 @@ async function request(base, path, method = 'GET', token, body) {
 async function run() {
   const [admins] = await db.query("SELECT id, email, role FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
   const [members] = await db.query(
-    "SELECT id, email, role FROM users WHERE role IN ('member','team_lead') ORDER BY id LIMIT 1"
+    "SELECT id, email, role FROM users WHERE role = 'member' ORDER BY id LIMIT 1"
   );
   const admin = admins[0];
   const member = members[0];
@@ -52,7 +52,7 @@ async function run() {
     const memberUsers = await request(base, '/auth/users', 'GET', memberToken);
     push('Member blocked from /auth/users', memberUsers.status === 403, `status=${memberUsers.status}`);
 
-    const registerAdmin = await request(base, '/auth/register', 'POST', null, {
+    const registerWithoutAuth = await request(base, '/auth/register', 'POST', null, {
       first_name: 'Role',
       last_name: 'Probe',
       email: `role_probe_${Date.now()}@example.com`,
@@ -60,14 +60,36 @@ async function run() {
       role: 'admin'
     });
     push(
-      'Public register cannot create admin role',
-      registerAdmin.status === 400 || registerAdmin.status === 201,
-      `status=${registerAdmin.status}`
+      'Public register blocked (admin-only policy)',
+      registerWithoutAuth.status === 401,
+      `status=${registerWithoutAuth.status}`
     );
-    if (registerAdmin.status === 201) {
-      const role = registerAdmin.data?.data?.user?.role;
-      push('Registered user role is member', role === 'member', `role=${role}`);
-    }
+
+    const registerByMember = await request(base, '/auth/register', 'POST', memberToken, {
+      first_name: 'Role',
+      last_name: 'ProbeMember',
+      email: `role_probe_member_${Date.now()}@example.com`,
+      password: 'Password123!',
+      role: 'member'
+    });
+    push(
+      'Non-admin register blocked',
+      registerByMember.status === 403,
+      `status=${registerByMember.status}`
+    );
+
+    const registerByAdmin = await request(base, '/auth/register', 'POST', adminToken, {
+      first_name: 'Role',
+      last_name: 'ProbeAdmin',
+      email: `role_probe_admin_${Date.now()}@example.com`,
+      password: 'Password123!',
+      role: 'member'
+    });
+    push(
+      'Admin can register member account',
+      registerByAdmin.status === 201,
+      `status=${registerByAdmin.status}`
+    );
 
     const memberCreateTask = await request(base, '/tasks', 'POST', memberToken, {
       title: 'AuthZ test task',

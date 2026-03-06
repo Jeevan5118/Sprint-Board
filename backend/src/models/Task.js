@@ -2,10 +2,10 @@ const db = require('../config/database');
 
 class Task {
   static async create(taskData) {
-    const { title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, type, priority, story_points, estimated_hours, due_date } = taskData;
+    const { title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date } = taskData;
     const [result] = await db.query(
-      'INSERT INTO tasks (title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, type, priority, story_points, estimated_hours, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, type, priority, story_points, estimated_hours, due_date]
+      'INSERT INTO tasks (title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date]
     );
     return result.insertId;
   }
@@ -76,7 +76,7 @@ class Task {
     return rows;
   }
 
-  static async update(id, taskData) {
+  static async update(id, taskData, executor = db) {
     const fields = [];
     const values = [];
 
@@ -86,16 +86,45 @@ class Task {
     });
 
     values.push(id);
-    const [result] = await db.query(
+    const [result] = await executor.query(
       `UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`,
       values
     );
     return result.affectedRows;
   }
 
-  static async updateStatus(id, status) {
-    const [result] = await db.query('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
+  static async findStatusById(id, executor = db) {
+    const [rows] = await executor.query('SELECT status FROM tasks WHERE id = ?', [id]);
+    return rows[0] || null;
+  }
+
+  static async insertStatusHistory(taskId, fromStatus, toStatus, changedBy, executor = db) {
+    const [result] = await executor.query(
+      'INSERT INTO task_status_history (task_id, from_status, to_status, changed_by) VALUES (?, ?, ?, ?)',
+      [taskId, fromStatus, toStatus, changedBy]
+    );
+    return result.insertId;
+  }
+
+  static async updateStatus(id, status, executor = db) {
+    const [result] = await executor.query('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
     return result.affectedRows;
+  }
+
+  static async getKanbanColumnLimit(projectId, columnName, executor = db) {
+    const [rows] = await executor.query(
+      'SELECT wip_limit FROM kanban_column_limits WHERE project_id = ? AND column_name = ? LIMIT 1',
+      [projectId, columnName]
+    );
+    return rows[0] || null;
+  }
+
+  static async countTasksByProjectAndStatus(projectId, status, executor = db) {
+    const [rows] = await executor.query(
+      'SELECT COUNT(*) AS total FROM tasks WHERE project_id = ? AND status = ?',
+      [projectId, status]
+    );
+    return Number(rows[0]?.total || 0);
   }
 
   static async delete(id) {
@@ -146,6 +175,24 @@ class Task {
       [taskId]
     );
     return rows;
+  }
+
+  static async getAttachmentById(attachmentId) {
+    const [rows] = await db.query(
+      `SELECT ta.*
+       FROM task_attachments ta
+       WHERE ta.id = ?`,
+      [attachmentId]
+    );
+    return rows[0] || null;
+  }
+
+  static async deleteAttachmentById(attachmentId) {
+    const [result] = await db.query(
+      'DELETE FROM task_attachments WHERE id = ?',
+      [attachmentId]
+    );
+    return result.affectedRows;
   }
 }
 
