@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { teamService } from '../../services/teamService';
+import { projectService } from '../../services/projectService';
 import { sprintService } from '../../services/sprintService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,7 +20,16 @@ const Sidebar = () => {
           return;
         }
 
-        setKanbanTeamLink(`/teams/${teams[0].id}/kanban`);
+        const projects = await projectService.getAllProjects();
+        const teamIds = new Set(teams.map((t) => Number(t.id)));
+        const kanbanProject = (projects || []).find(
+          (p) => p.board_type === 'kanban' && teamIds.has(Number(p.team_id))
+        );
+        if (kanbanProject?.team_id) {
+          setKanbanTeamLink(`/teams/${kanbanProject.team_id}/kanban`);
+        } else {
+          setKanbanTeamLink(null);
+        }
 
         let fallbackLink = null;
         for (const team of teams) {
