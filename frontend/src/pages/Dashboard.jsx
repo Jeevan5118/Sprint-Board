@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardService } from '../services/dashboardService';
+import { teamService } from '../services/teamService';
+import { projectService } from '../services/projectService';
+import { sprintService } from '../services/sprintService';
+import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/error';
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,6 +19,8 @@ const Dashboard = () => {
   const [progressReportLoading, setProgressReportLoading] = useState(true);
   const [progressReportError, setProgressReportError] = useState('');
   const [deadlineAlerts, setDeadlineAlerts] = useState(null);
+  const [teamBoards, setTeamBoards] = useState([]);
+  const [teamBoardsError, setTeamBoardsError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -22,20 +29,44 @@ const Dashboard = () => {
       setError('');
       setProgressReportError('');
       setProgressReportLoading(true);
+      setTeamBoardsError('');
       try {
-        const [userDashboard, teamProjectProgress, alerts] = await Promise.all([
+        const [userDashboard, teamProjectProgress, alerts, teams, projects] = await Promise.all([
           dashboardService.getUserDashboard(),
           dashboardService.getTeamProjectProgress(),
-          dashboardService.getDeadlineAlerts()
+          dashboardService.getDeadlineAlerts(),
+          user?.role === 'admin' ? teamService.getAllTeams() : teamService.getMyTeams(),
+          projectService.getAllProjects()
         ]);
+
+        const sprintByTeam = await Promise.all(
+          (teams || []).map(async (team) => {
+            const sprints = await sprintService.getSprintsByTeam(team.id);
+            const active = (sprints || []).find((s) => s.status === 'active');
+            const hasKanban = (projects || []).some(
+              (p) => Number(p.team_id) === Number(team.id) && p.board_type === 'kanban'
+            );
+            return {
+              teamId: team.id,
+              teamName: team.name,
+              sprintCount: (sprints || []).length,
+              activeSprintId: active?.id || null,
+              activeSprintName: active?.name || '',
+              hasKanban
+            };
+          })
+        );
+
         if (!cancelled) {
           setStats(userDashboard.stats);
           setProgressReport(teamProjectProgress);
           setDeadlineAlerts(alerts);
+          setTeamBoards(sprintByTeam);
         }
       } catch (err) {
         if (!cancelled) {
           setError(getErrorMessage(err, 'Failed to load dashboard'));
+          setTeamBoardsError(getErrorMessage(err, 'Failed to load team board overview'));
         }
       } finally {
         if (!cancelled) {
@@ -48,7 +79,7 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.role]);
 
   const total = stats?.assigned_tasks ?? 0;
   const completed = stats?.completed_tasks ?? 0;
@@ -103,7 +134,7 @@ const Dashboard = () => {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-[#172B4D]">Dashboard</h1>
-        <p className="text-gray-500 mt-2">Track your sprint progress and task status.</p>
+        <p className="text-gray-500 mt-2">Track your team board progress and task status.</p>
       </div>
 
       {loading && (
@@ -192,6 +223,60 @@ const Dashboard = () => {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="mt-8 card">
+            <h2 className="text-lg font-bold text-[#172B4D] mb-4">Team Boards Overview</h2>
+            {teamBoardsError && (
+              <div className="text-sm text-[#DE350B] bg-[#FFEBE6] p-2 rounded-[3px] border border-[#FFBDAD] mb-3">
+                {teamBoardsError}
+              </div>
+            )}
+            {teamBoards.length === 0 ? (
+              <div className="text-sm text-[#5E6C84]">No teams available for board overview.</div>
+            ) : (
+              <div className="space-y-3 mb-6">
+                {teamBoards.map((teamBoard) => (
+                  <div key={teamBoard.teamId} className="border border-[#DFE1E6] rounded-[3px] p-3 bg-[#FAFBFC]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-bold text-[#172B4D]">{teamBoard.teamName}</div>
+                        <div className="text-xs text-[#6B778C] mt-0.5">
+                          Sprints: {teamBoard.sprintCount}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {teamBoard.activeSprintId ? (
+                          <Link
+                            to={`/teams/${teamBoard.teamId}/sprints/${teamBoard.activeSprintId}/board`}
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#0052CC] text-[#0052CC] hover:bg-[#E6EFFC]"
+                          >
+                            Open Active Sprint
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
+                            No active sprint
+                          </span>
+                        )}
+                        {teamBoard.hasKanban ? (
+                          <Link
+                            to={`/teams/${teamBoard.teamId}/kanban`}
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#36B37E] text-[#00875A] hover:bg-[#E3FCEF]"
+                          >
+                            Open Kanban
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
+                            No kanban project
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
           </div>
 
           <div className="mt-8 card">
