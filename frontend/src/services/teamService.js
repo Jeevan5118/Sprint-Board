@@ -9,6 +9,14 @@ export const teamService = {
         const response = await api.post('/teams', teamData);
         return response.data.data.team;
     },
+    updateTeam: async (teamId, payload) => {
+        const response = await api.patch(`/teams/${teamId}`, payload);
+        return response.data.data.team;
+    },
+    deleteTeam: async (teamId) => {
+        const response = await api.delete(`/teams/${teamId}`);
+        return response.data;
+    },
     getAvailableMembers: async () => {
         const response = await api.get('/teams/available-members/list');
         return response.data.data.members;

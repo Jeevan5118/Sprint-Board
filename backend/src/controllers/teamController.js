@@ -17,6 +17,36 @@ class TeamController {
     }
   }
 
+  static async updateTeam(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { name, description } = req.body;
+      const team = await TeamService.updateTeam(id, { name, description }, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: 'Team updated successfully',
+        data: { team }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteTeam(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await TeamService.deleteTeam(id, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getAllTeams(req, res, next) {
     try {
       const teams = await TeamService.getAllTeams();

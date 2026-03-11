@@ -219,6 +219,45 @@ const Teams = () => {
         }
     };
 
+    const handleEditTeam = async (team) => {
+        const nextName = window.prompt('Enter new team name:', team.name || '');
+        if (nextName === null) return;
+        const normalizedName = nextName.trim();
+        if (!normalizedName) {
+            alert('Team name cannot be empty.');
+            return;
+        }
+
+        const nextDescription = window.prompt('Enter team description (optional):', team.description || '');
+        if (nextDescription === null) return;
+
+        try {
+            const updated = await teamService.updateTeam(team.id, {
+                name: normalizedName,
+                description: nextDescription.trim()
+            });
+            setTeams((prev) => prev.map((t) => (Number(t.id) === Number(team.id) ? { ...t, ...updated } : t)));
+        } catch (err) {
+            alert(getErrorMessage(err, 'Failed to update team'));
+        }
+    };
+
+    const handleDeleteTeam = async (team) => {
+        if (!window.confirm(`Delete team "${team.name}"? This will remove its projects and related data.`)) return;
+        try {
+            await teamService.deleteTeam(team.id);
+            setTeams((prev) => prev.filter((t) => Number(t.id) !== Number(team.id)));
+            setExpandedTeams((prev) => {
+                const next = { ...prev };
+                delete next[team.id];
+                return next;
+            });
+            await fetchAvailableMembers();
+        } catch (err) {
+            alert(getErrorMessage(err, 'Failed to delete team'));
+        }
+    };
+
     const filteredTeams = teams.filter((team) => {
         const q = debouncedSearchTerm.trim().toLowerCase();
         if (!q) return true;
@@ -308,15 +347,41 @@ const Teams = () => {
                                                         <div className="text-[14px] text-[#5E6C84] line-clamp-2 leading-relaxed">{team.description || 'No description provided.'}</div>
                                                     </td>
                                                     <td className="px-6 py-5 whitespace-nowrap">
-                                                        <button
-                                                            className="text-[#0052CC] text-[13px] font-bold hover:underline flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-[#E6EFFC] transition-all"
-                                                            onClick={(e) => { e.stopPropagation(); toggleTeamMembers(team.id); }}
-                                                        >
-                                                            {expandedTeams[team.id] ? 'Hide members' : 'View members'}
-                                                            <span className={`transition-transform duration-300 ${expandedTeams[team.id] ? 'rotate-180' : ''}`}>
-                                                                ▼
-                                                            </span>
-                                                        </button>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                className="text-[#0052CC] text-[13px] font-bold hover:underline flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-[#E6EFFC] transition-all"
+                                                                onClick={(e) => { e.stopPropagation(); toggleTeamMembers(team.id); }}
+                                                            >
+                                                                {expandedTeams[team.id] ? 'Hide members' : 'View members'}
+                                                                <span className={`transition-transform duration-300 ${expandedTeams[team.id] ? 'rotate-180' : ''}`}>
+                                                                    ▼
+                                                                </span>
+                                                            </button>
+                                                            {isAdmin && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-[12px] font-semibold text-[#0052CC] px-2 py-1 rounded hover:bg-[#E6EFFC]"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleEditTeam(team);
+                                                                        }}
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-[12px] font-semibold text-[#DE350B] px-2 py-1 rounded hover:bg-[#FFEBE6]"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteTeam(team);
+                                                                        }}
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 {expandedTeams[team.id] && (
@@ -649,6 +714,7 @@ const Teams = () => {
 };
 
 export default Teams;
+
 
 
 

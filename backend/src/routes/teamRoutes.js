@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const TeamController = require('../controllers/teamController');
-const { createTeamValidator, addMemberValidator, removeMemberValidator, memberTasksValidator, setTeamLeadValidator, teamIdValidator } = require('../validators/teamValidator');
+const { createTeamValidator, updateTeamValidator, addMemberValidator, removeMemberValidator, memberTasksValidator, setTeamLeadValidator, teamIdValidator } = require('../validators/teamValidator');
 const validationMiddleware = require('../middlewares/validationMiddleware');
 const { authMiddleware, roleMiddleware } = require('../middlewares/authMiddleware');
 
@@ -15,6 +15,8 @@ router.get('/:id/members/:userId/tasks', authMiddleware, memberTasksValidator, v
 
 // Team creation remains admin-only
 router.post('/', authMiddleware, roleMiddleware('admin'), createTeamValidator, validationMiddleware, TeamController.createTeam);
+router.patch('/:id', authMiddleware, roleMiddleware('admin'), updateTeamValidator, validationMiddleware, TeamController.updateTeam);
+router.delete('/:id', authMiddleware, roleMiddleware('admin'), teamIdValidator, validationMiddleware, TeamController.deleteTeam);
 
 // Team management (scope validated in service)
 router.get('/available-members/list', authMiddleware, TeamController.getAvailableMembers);

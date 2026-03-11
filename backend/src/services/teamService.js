@@ -30,6 +30,52 @@ class TeamService {
     return await Team.findById(teamId);
   }
 
+  static async updateTeam(teamId, payload, requester) {
+    if (!isAdmin(requester)) {
+      throw { statusCode: 403, message: 'Only admin can update team details' };
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(payload, 'name')) {
+      const normalizedName = String(payload.name || '').trim();
+      if (!normalizedName) {
+        throw { statusCode: 400, message: 'Team name is required' };
+      }
+      updates.name = normalizedName;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      const normalizedDescription = String(payload.description || '').trim();
+      updates.description = normalizedDescription || null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return await this.getTeamById(teamId, requester);
+    }
+
+    await Team.update(teamId, updates);
+    return await this.getTeamById(teamId, requester);
+  }
+
+  static async deleteTeam(teamId, requester) {
+    if (!isAdmin(requester)) {
+      throw { statusCode: 403, message: 'Only admin can delete teams' };
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    await Team.delete(teamId);
+    return { message: 'Team deleted successfully' };
+  }
+
   static async getAllTeams() {
     return await Team.getAll();
   }

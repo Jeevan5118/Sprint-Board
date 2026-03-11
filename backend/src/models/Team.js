@@ -86,6 +86,37 @@ class Team {
     return result.affectedRows;
   }
 
+  static async update(id, payload) {
+    const fields = [];
+    const values = [];
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'name')) {
+      fields.push('name = ?');
+      values.push(payload.name);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      fields.push('description = ?');
+      values.push(payload.description);
+    }
+
+    if (fields.length === 0) {
+      return 0;
+    }
+
+    values.push(id);
+    const [result] = await db.query(
+      `UPDATE teams SET ${fields.join(', ')} WHERE id = ?`,
+      values
+    );
+    return result.affectedRows;
+  }
+
+  static async delete(id) {
+    const [result] = await db.query('DELETE FROM teams WHERE id = ?', [id]);
+    return result.affectedRows;
+  }
+
   static async isMemberExists(teamId, userId) {
     const [rows] = await db.query(
       `SELECT id
