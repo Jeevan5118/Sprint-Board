@@ -40,7 +40,6 @@ class AuthService {
     const normalizedRole = ['member', 'team_lead', 'admin'].includes(role) ? role : 'member';
     const teamId = Number(team_id);
     const normalizedName = String(userData.name || '').trim();
-    const normalizedDoj = String(userData.doj || '').trim();
 
     let firstName = String(userData.first_name || '').trim();
     let lastName = String(userData.last_name || '').trim();
@@ -53,10 +52,6 @@ class AuthService {
 
     if (!firstName) {
       throw { statusCode: 400, message: 'Member name is required' };
-    }
-
-    if (!normalizedDoj) {
-      throw { statusCode: 400, message: 'DOJ is required' };
     }
 
     if (!Number.isInteger(teamId) || teamId <= 0) {
@@ -79,8 +74,7 @@ class AuthService {
       password: hashedPassword,
       first_name: firstName,
       last_name: lastName,
-      role: normalizedRole,
-      doj: normalizedDoj
+      role: normalizedRole
     });
 
     await Team.addMember(teamId, userId);

@@ -23,7 +23,6 @@ const Account = () => {
     name: '',
     email: '',
     password: '',
-    doj: '',
     team_id: '',
     role: 'member'
   });
@@ -122,7 +121,6 @@ const Account = () => {
         name: '',
         email: '',
         password: '',
-        doj: '',
         team_id: '',
         role: 'member'
       });
@@ -256,17 +254,6 @@ const Account = () => {
                     onChange={handleCreateFormChange}
                     className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
                     minLength={6}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#5E6C84] mb-1.5 uppercase">DOJ (Date of Joining)</label>
-                  <input
-                    type="date"
-                    name="doj"
-                    value={createForm.doj}
-                    onChange={handleCreateFormChange}
-                    className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
                     required
                   />
                 </div>
