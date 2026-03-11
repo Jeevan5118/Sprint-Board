@@ -184,6 +184,58 @@ const Dashboard = () => {
 
           <div className="mt-6 card">
             <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-[#172B4D]">Team Boards Overview</h2>
+              <Link to="/teams" className="text-sm text-[#0052CC] hover:underline">
+                View Teams
+              </Link>
+            </div>
+            {teamBoardsError && (
+              <div className="text-sm text-[#DE350B] bg-[#FFEBE6] p-2 rounded-[3px] border border-[#FFBDAD] mb-3">
+                {teamBoardsError}
+              </div>
+            )}
+            {teamBoards.length === 0 ? (
+              <div className="text-sm text-[#5E6C84]">No teams available for board overview.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {teamBoards.map((teamBoard) => (
+                  <div key={`top-${teamBoard.teamId}`} className="border border-[#DFE1E6] rounded-[3px] p-3 bg-[#FAFBFC]">
+                    <div className="text-sm font-bold text-[#172B4D]">{teamBoard.teamName}</div>
+                    <div className="text-xs text-[#6B778C] mt-0.5">Sprints: {teamBoard.sprintCount}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {teamBoard.activeSprintId ? (
+                        <Link
+                          to={`/teams/${teamBoard.teamId}/sprints/${teamBoard.activeSprintId}/board`}
+                          className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#0052CC] text-[#0052CC] hover:bg-[#E6EFFC]"
+                        >
+                          Open Active Sprint
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
+                          No active sprint
+                        </span>
+                      )}
+                      {teamBoard.hasKanban ? (
+                        <Link
+                          to={`/teams/${teamBoard.teamId}/kanban`}
+                          className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#36B37E] text-[#00875A] hover:bg-[#E3FCEF]"
+                        >
+                          Open Kanban
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
+                          No kanban project
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 card">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-[#172B4D]">Deadline Alerts</h2>
               <Link to="/timeline" className="text-sm text-[#0052CC] hover:underline">
                 View Timeline
@@ -223,60 +275,6 @@ const Dashboard = () => {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="mt-8 card">
-            <h2 className="text-lg font-bold text-[#172B4D] mb-4">Team Boards Overview</h2>
-            {teamBoardsError && (
-              <div className="text-sm text-[#DE350B] bg-[#FFEBE6] p-2 rounded-[3px] border border-[#FFBDAD] mb-3">
-                {teamBoardsError}
-              </div>
-            )}
-            {teamBoards.length === 0 ? (
-              <div className="text-sm text-[#5E6C84]">No teams available for board overview.</div>
-            ) : (
-              <div className="space-y-3 mb-6">
-                {teamBoards.map((teamBoard) => (
-                  <div key={teamBoard.teamId} className="border border-[#DFE1E6] rounded-[3px] p-3 bg-[#FAFBFC]">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-bold text-[#172B4D]">{teamBoard.teamName}</div>
-                        <div className="text-xs text-[#6B778C] mt-0.5">
-                          Sprints: {teamBoard.sprintCount}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {teamBoard.activeSprintId ? (
-                          <Link
-                            to={`/teams/${teamBoard.teamId}/sprints/${teamBoard.activeSprintId}/board`}
-                            className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#0052CC] text-[#0052CC] hover:bg-[#E6EFFC]"
-                          >
-                            Open Active Sprint
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
-                            No active sprint
-                          </span>
-                        )}
-                        {teamBoard.hasKanban ? (
-                          <Link
-                            to={`/teams/${teamBoard.teamId}/kanban`}
-                            className="text-xs font-semibold px-2.5 py-1.5 rounded-[3px] border border-[#36B37E] text-[#00875A] hover:bg-[#E3FCEF]"
-                          >
-                            Open Kanban
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-[#6B778C] px-2 py-1 border border-[#DFE1E6] rounded-[3px]">
-                            No kanban project
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
           </div>
 
           <div className="mt-8 card">
