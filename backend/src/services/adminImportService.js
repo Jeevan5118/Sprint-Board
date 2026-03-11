@@ -6,14 +6,14 @@ const ALLOWED_ROLES = ['admin', 'team_lead', 'member'];
 const ALLOWED_BOARD_TYPES = ['scrum', 'kanban'];
 
 const REQUIRED_COLUMNS = {
-  employees: ['email', 'password', 'first_name', 'last_name'],
+  employees: ['email', 'password', 'team', 'projects'],
   teams: ['name'],
   projects: ['name', 'key_code'],
   team_members: []
 };
 
 const SAMPLE_COLUMNS = {
-  employees: ['email', 'password', 'first_name', 'last_name', 'role'],
+  employees: ['name', 'email', 'password', 'team', 'projects', 'role', 'doj'],
   teams: ['name', 'description', 'team_lead_email'],
   projects: ['name', 'key_code', 'description', 'team_id', 'team_name', 'board_type', 'start_date', 'end_date'],
   team_members: ['team_id', 'team_name', 'user_id', 'user_email', 'is_team_lead']
@@ -173,7 +173,7 @@ class AdminImportService {
 
   static async processRow(importType, row, createdBy, connection) {
     if (importType === 'employees') {
-      return this.processEmployeeRow(row, connection);
+      return this.processEmployeeRow(row, createdBy, connection);
     }
     if (importType === 'teams') {
       return this.processTeamRow(row, connection);
@@ -184,30 +184,178 @@ class AdminImportService {
     return this.processTeamMemberRow(row, connection);
   }
 
-  static async processEmployeeRow(row, connection) {
+  static splitName(fullName) {
+    const normalized = String(fullName || '').trim();
+    if (!normalized) return { firstName: '', lastName: '' };
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    return {
+      firstName: parts.shift() || '',
+      lastName: parts.join(' ')
+    };
+  }
+
+  static normalizeProjectKeyBase(projectName) {
+    const raw = String(projectName || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9 ]/g, ' ')
+      .trim();
+    if (!raw) return 'PRJ';
+    const words = raw.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return 'PRJ';
+    const acronym = words.map((w) => w[0]).join('');
+    const compact = raw.replace(/\s+/g, '');
+    const base = (acronym.length >= 2 ? acronym : compact).slice(0, 6);
+    return base || 'PRJ';
+  }
+
+  static async generateUniqueProjectKey(projectName, connection) {
+    const base = this.normalizeProjectKeyBase(projectName);
+    const [matches] = await connection.query(
+      'SELECT key_code FROM projects WHERE key_code = ? OR key_code LIKE ?',
+      [base, `${base}%`]
+    );
+    if (matches.length === 0) {
+      return base;
+    }
+    let suffix = 2;
+    while (suffix < 10000) {
+      const candidate = `${base}${suffix}`.slice(0, 10);
+      if (!matches.some((m) => String(m.key_code).toUpperCase() === candidate.toUpperCase())) {
+        return candidate;
+      }
+      suffix += 1;
+    }
+    throw new Error(`Unable to generate unique project key for ${projectName}`);
+  }
+
+  static parseProjectsField(value) {
+    return String(value || '')
+      .split(';')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  static async resolveOrCreateTeamByName(teamName, connection) {
+    const normalizedTeam = String(teamName || '').trim();
+    if (!normalizedTeam) {
+      throw new Error('team is required');
+    }
+
+    const [existing] = await connection.query(
+      'SELECT id FROM teams WHERE LOWER(name) = LOWER(?) LIMIT 1',
+      [normalizedTeam]
+    );
+    if (existing.length > 0) {
+      return { teamId: Number(existing[0].id), created: false };
+    }
+
+    const [insert] = await connection.query(
+      'INSERT INTO teams (name, description, team_lead_id) VALUES (?, ?, ?)',
+      [normalizedTeam, null, null]
+    );
+    return { teamId: Number(insert.insertId), created: true };
+  }
+
+  static async resolveOrCreateProject(projectName, teamId, createdBy, connection) {
+    const normalizedProject = String(projectName || '').trim();
+    if (!normalizedProject) return { projectId: null, created: false };
+
+    const [existing] = await connection.query(
+      'SELECT id FROM projects WHERE team_id = ? AND LOWER(name) = LOWER(?) LIMIT 1',
+      [teamId, normalizedProject]
+    );
+    if (existing.length > 0) {
+      return { projectId: Number(existing[0].id), created: false };
+    }
+
+    const keyCode = await this.generateUniqueProjectKey(normalizedProject, connection);
+    const [insert] = await connection.query(
+      `INSERT INTO projects
+       (name, key_code, description, team_id, created_by, start_date, end_date, board_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [normalizedProject, keyCode, null, teamId, createdBy, null, null, 'scrum']
+    );
+    return { projectId: Number(insert.insertId), created: true };
+  }
+
+  static async processEmployeeRow(row, createdBy, connection) {
     const email = getValue(row, ['email']).toLowerCase();
     const password = getValue(row, ['password']);
-    const firstName = getValue(row, ['first_name', 'firstname', 'first name']);
-    const lastName = getValue(row, ['last_name', 'lastname', 'last name']);
+    const fullName =
+      getValue(row, ['name', 'member_name']) ||
+      `${getValue(row, ['first_name', 'firstname', 'first name'])} ${getValue(row, ['last_name', 'lastname', 'last name'])}`.trim();
+    const { firstName, lastName } = this.splitName(fullName);
+    const doj = getValue(row, ['doj', 'date_of_joining', 'date of joining']) || null;
+    const teamName = getValue(row, ['team', 'team_name']);
+    const projectNames = this.parseProjectsField(getValue(row, ['projects', 'project']));
     const roleRaw = getValue(row, ['role']).toLowerCase();
     const role = ALLOWED_ROLES.includes(roleRaw) ? roleRaw : 'member';
 
-    if (!email || !password || !firstName || !lastName) {
-      throw new Error('Missing required employee columns: email, password, first_name, last_name');
+    if (!email || !password || !firstName) {
+      throw new Error('Missing required employee columns: name, email, password');
     }
+    if (!teamName) {
+      throw new Error('Missing required employee column: team');
+    }
+    if (projectNames.length === 0) {
+      throw new Error('Missing required employee column: projects');
+    }
+
+    let anyCreated = false;
 
     const [existing] = await connection.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
+    let userId;
     if (existing.length > 0) {
-      return 'skipped';
+      userId = Number(existing[0].id);
+    } else {
+      const hashedPassword = await hashPassword(password);
+      try {
+        const [insert] = await connection.query(
+          'INSERT INTO users (email, password, first_name, last_name, role, doj) VALUES (?, ?, ?, ?, ?, ?)',
+          [email, hashedPassword, firstName, lastName, role, doj]
+        );
+        userId = Number(insert.insertId);
+      } catch (error) {
+        if (error?.code === 'ER_BAD_FIELD_ERROR') {
+          const [insert] = await connection.query(
+            'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)',
+            [email, hashedPassword, firstName, lastName, role]
+          );
+          userId = Number(insert.insertId);
+        } else {
+          throw error;
+        }
+      }
+      anyCreated = true;
     }
 
-    const hashedPassword = await hashPassword(password);
-    await connection.query(
-      'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)',
-      [email, hashedPassword, firstName, lastName, role]
-    );
+    const { teamId, created: teamCreated } = await this.resolveOrCreateTeamByName(teamName, connection);
+    anyCreated = anyCreated || teamCreated;
 
-    return 'created';
+    const [tmInsert] = await connection.query(
+      'INSERT IGNORE INTO team_members (team_id, user_id) VALUES (?, ?)',
+      [teamId, userId]
+    );
+    anyCreated = anyCreated || tmInsert.affectedRows > 0;
+
+    if (role === 'team_lead') {
+      await connection.query('UPDATE users SET role = ? WHERE id = ? AND role = ?', ['team_lead', userId, 'member']);
+      await connection.query('UPDATE teams SET team_lead_id = ? WHERE id = ?', [userId, teamId]);
+    }
+
+    for (const projectName of projectNames) {
+      const { projectId, created } = await this.resolveOrCreateProject(projectName, teamId, createdBy, connection);
+      if (!projectId) continue;
+      anyCreated = anyCreated || created;
+
+      const [pmInsert] = await connection.query(
+        'INSERT IGNORE INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
+        [projectId, userId, 'developer']
+      );
+      anyCreated = anyCreated || pmInsert.affectedRows > 0;
+    }
+
+    return anyCreated ? 'created' : 'skipped';
   }
 
   static async resolveUserId(row, connection) {

@@ -99,7 +99,7 @@ const Projects = () => {
     };
 
     const columnTemplates = {
-        employees: 'email,password,first_name,last_name,role',
+        employees: 'name,email,password,team,projects,role,doj',
         teams: 'name,description,team_lead_email',
         projects: 'name,key_code,description,team_id,team_name,board_type,start_date,end_date',
         team_members: 'team_id,team_name,user_id,user_email,is_team_lead'
