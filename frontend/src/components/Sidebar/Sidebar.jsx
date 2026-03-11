@@ -1,54 +1,57 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { projectService } from '../../services/projectService';
+import { teamService } from '../../services/teamService';
 import { sprintService } from '../../services/sprintService';
+import { useAuth } from '../../context/AuthContext';
 
 const Sidebar = () => {
+  const { user } = useAuth();
   const [activeSprintLink, setActiveSprintLink] = useState(null);
-  const [kanbanProjectLink, setKanbanProjectLink] = useState(null);
+  const [kanbanTeamLink, setKanbanTeamLink] = useState(null);
 
   useEffect(() => {
-    const fetchSprintLink = async () => {
+    const fetchBoardLinks = async () => {
       try {
-        const projects = await projectService.getAllProjects();
-        if (projects.length === 0) return;
+        const teams = user?.role === 'admin'
+          ? await teamService.getAllTeams()
+          : await teamService.getMyTeams();
+        if (!teams || teams.length === 0) {
+          return;
+        }
 
-        // Search ALL projects for an active sprint
+        setKanbanTeamLink(`/teams/${teams[0].id}/kanban`);
+
         let fallbackLink = null;
-        let firstProjectLink = `/projects/${projects[0].id}`;
-        setKanbanProjectLink(`/projects/${projects[0].id}/kanban`);
-
-        for (const project of projects) {
-          const sprints = await sprintService.getSprintsByProject(project.id);
+        for (const team of teams) {
+          const sprints = await sprintService.getSprintsByTeam(team.id);
           if (!sprints || sprints.length === 0) continue;
 
-          const activeSprint = sprints.find(s => s.status === 'active');
+          const activeSprint = sprints.find((s) => s.status === 'active');
           if (activeSprint) {
-            setActiveSprintLink(`/projects/${project.id}/sprints/${activeSprint.id}/board`);
+            setActiveSprintLink(`/teams/${team.id}/sprints/${activeSprint.id}/board`);
             return;
           }
 
           if (!fallbackLink) {
-            fallbackLink = `/projects/${project.id}/sprints/${sprints[0].id}/board`;
+            fallbackLink = `/teams/${team.id}/sprints/${sprints[0].id}/board`;
           }
         }
 
-        // If no active sprint found, use the first available sprint or the first project details
-        setActiveSprintLink(fallbackLink || firstProjectLink);
+        setActiveSprintLink(fallbackLink);
       } catch (error) {
-        console.error("Failed to fetch sidebar navigation data", error);
+        console.error('Failed to fetch sidebar navigation data', error);
       }
     };
 
-    fetchSprintLink();
-  }, []);
+    fetchBoardLinks();
+  }, [user?.role]);
 
   return (
     <aside className="app-shell-sidebar">
       <div className="sidebar flex flex-col h-full bg-white border-r border-[#DFE1E6]">
         <div className="mb-8 px-2 py-4">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#E6EFFC] text-[#0052CC]">
-            <span className="text-xl">🚀</span>
+            <span className="text-xl">??</span>
             <span className="font-extrabold tracking-tight text-lg">ScrumBoard</span>
           </div>
         </div>
@@ -64,7 +67,7 @@ const Sidebar = () => {
               }`
             }
           >
-            <span className="text-lg">📊</span>
+            <span className="text-lg">??</span>
             <span>Dashboard</span>
           </NavLink>
 
@@ -75,7 +78,7 @@ const Sidebar = () => {
               }`
             }
           >
-            <span className="text-lg">📁</span>
+            <span className="text-lg">??</span>
             <span>Projects</span>
           </NavLink>
 
@@ -86,7 +89,7 @@ const Sidebar = () => {
               }`
             }
           >
-            <span className="text-lg">📅</span>
+            <span className="text-lg">??</span>
             <span>Timeline</span>
           </NavLink>
 
@@ -97,7 +100,7 @@ const Sidebar = () => {
               }`
             }
           >
-            <span className="text-lg">👥</span>
+            <span className="text-lg">??</span>
             <span>Teams</span>
           </NavLink>
 
@@ -110,30 +113,30 @@ const Sidebar = () => {
                 }`
               }
             >
-              <span className="text-lg">📋</span>
+              <span className="text-lg">??</span>
               <span>Sprint Board</span>
             </NavLink>
           ) : (
             <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-300 cursor-not-allowed opacity-50">
-              <span className="text-lg">📋</span>
+              <span className="text-lg">??</span>
               <span>Sprint Board</span>
             </div>
           )}
 
-          {kanbanProjectLink ? (
+          {kanbanTeamLink ? (
             <NavLink
-              to={kanbanProjectLink}
+              to={kanbanTeamLink}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mt-1 ${isActive ? 'bg-[#E6EFFC] text-[#0052CC]' : 'text-[#42526E] hover:bg-[#F4F5F7]'
                 }`
               }
             >
-              <span className="text-lg">🗂️</span>
+              <span className="text-lg">???</span>
               <span>Kanban Board</span>
             </NavLink>
           ) : (
             <div className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-300 cursor-not-allowed opacity-50 mt-1">
-              <span className="text-lg">🗂️</span>
+              <span className="text-lg">???</span>
               <span>Kanban Board</span>
             </div>
           )}

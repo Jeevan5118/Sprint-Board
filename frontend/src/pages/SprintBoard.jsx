@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
 import { sprintService } from '../services/sprintService';
@@ -11,7 +11,8 @@ import useDebouncedValue from '../hooks/useDebouncedValue';
 import { getErrorMessage } from '../utils/error';
 
 const SprintBoard = () => {
-  const { projectId, sprintId } = useParams();
+  const { projectId, teamId: routeTeamId, sprintId } = useParams();
+  const location = useLocation();
   const [backlog, setBacklog] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [project, setProject] = useState(null);
@@ -36,17 +37,29 @@ const SprintBoard = () => {
     setLoading(true);
     setError('');
     try {
-      const [sprintTasks, backlogTasks, projData, sprintsData] = await Promise.all([
+      const [sprintTasks, sprintInfo] = await Promise.all([
         taskService.getTasksBySprint(sprintId),
-        taskService.getBacklogByProject(projectId, sprintId),
-        projectService.getProjectById(projectId),
-        sprintService.getSprintsByProject(projectId)
+        sprintService.getSprintById(sprintId)
       ]);
+      const derivedTeamId = Number(routeTeamId) || Number(sprintInfo?.team_id || sprintTasks[0]?.team_id || 0);
+
+      const [backlogTasks, sprintsData] = await Promise.all([
+        derivedTeamId ? taskService.getBacklogByTeam(derivedTeamId) : [],
+        derivedTeamId ? sprintService.getSprintsByTeam(derivedTeamId) : []
+      ]);
+
+      let projData = null;
+      if (projectId) {
+        projData = await projectService.getProjectById(projectId);
+      } else if (sprintTasks[0]?.project_id) {
+        projData = await projectService.getProjectById(sprintTasks[0].project_id);
+      }
+
       setTasks(sprintTasks);
       setBacklog(backlogTasks);
       setProject(projData);
       // Normalize IDs to strings to handle mixed number/string payloads
-      const currentSprint = sprintsData.find((s) => String(s.id) === String(sprintId));
+      const currentSprint = sprintsData.find((s) => String(s.id) === String(sprintId)) || sprintInfo;
       setSprint(currentSprint);
       const active = sprintsData.find((s) => s.status === 'active');
       setActiveSprint(
@@ -57,11 +70,22 @@ const SprintBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, sprintId]);
+  }, [projectId, routeTeamId, sprintId]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskId = Number(params.get('taskId'));
+    if (!Number.isInteger(taskId) || taskId <= 0) return;
+
+    const exists = [...tasks, ...backlog].some((t) => Number(t.id) === taskId);
+    if (exists) {
+      setSelectedTaskId(taskId);
+    }
+  }, [location.search, tasks, backlog]);
 
   const filterTasks = (taskList) => {
     return taskList.filter(t => {
@@ -164,7 +188,7 @@ const SprintBoard = () => {
               <span>This sprint is completed and is now read-only.</span>
               {activeSprint && (
                 <Link
-                  to={`/projects/${projectId}/sprints/${activeSprint.id}/board`}
+                  to={`/teams/${sprint?.team_id || routeTeamId}/sprints/${activeSprint.id}/board`}
                   className="inline-flex items-center rounded-[3px] border border-[#DE350B] px-2.5 py-1 text-xs font-semibold text-[#DE350B] hover:bg-[#FFBDAD]"
                 >
                   Go to Active Sprint
@@ -183,12 +207,16 @@ const SprintBoard = () => {
             <nav className="flex items-center gap-1 text-[13px] text-gray-400 mb-2">
               <Link to="/projects" className="hover:text-[#0052CC] transition-colors">Projects</Link>
               <span className="mx-1">/</span>
-              <Link to={`/projects/${projectId}`} className="hover:text-[#0052CC] transition-colors">{project?.name || 'Project'}</Link>
+              {projectId ? (
+                <Link to={`/projects/${projectId}`} className="hover:text-[#0052CC] transition-colors">{project?.name || 'Project'}</Link>
+              ) : (
+                <span className="text-gray-500">{project?.name || `Team ${sprint?.team_id || routeTeamId}`}</span>
+              )}
               <span className="mx-1">/</span>
               <span className="text-gray-600 font-medium">{sprint?.name || 'Sprint'}</span>
             </nav>
             <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight">
-              {project?.key_code} {sprint?.name || 'Sprint Board'}
+              {(project?.key_code || 'TEAM')} {sprint?.name || 'Sprint Board'}
             </h1>
           </div>
           <div className="flex gap-3">
@@ -334,6 +362,7 @@ const SprintBoard = () => {
       {canCreateIssue && showCreateModal && (
         <CreateTaskModal
           projectId={projectId}
+          teamId={sprint?.team_id || routeTeamId}
           sprintId={sprintId}
           initialStatus={initialCreateStatus}
           onClose={() => setShowCreateModal(false)}

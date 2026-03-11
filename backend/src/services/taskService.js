@@ -6,7 +6,7 @@ const User = require('../models/User');
 const db = require('../config/database');
 const NotificationService = require('./notificationService');
 const FileStorageService = require('./fileStorageService');
-const { isAdmin, canManageProject } = require('../utils/permissions');
+const { isAdmin, canManageProject, canManageTeam } = require('../utils/permissions');
 
 class TaskService {
   static isMissingTableError(error, tableName) {
@@ -63,23 +63,7 @@ class TaskService {
     }
   }
 
-  static async enforceKanbanWipLimit(project, toStatus, executor) {
-    if (project.board_type !== 'kanban') {
-      return;
-    }
-
-    const limitRow = await Task.getKanbanColumnLimit(project.id, toStatus, executor);
-    if (!limitRow) {
-      return;
-    }
-
-    const currentCount = await Task.countTasksByProjectAndStatus(project.id, toStatus, executor);
-    if (currentCount >= Number(limitRow.wip_limit)) {
-      throw { statusCode: 400, message: `WIP limit reached for column '${toStatus}'` };
-    }
-  }
-
-  static async applyStatusChangeWithHistory(taskId, toStatus, userId, project, additionalUpdates = {}) {
+  static async applyStatusChangeWithHistory(taskId, toStatus, userId, teamId, additionalUpdates = {}) {
     return this.runWithDeadlockRetry(async () => {
       const connection = await db.getConnection();
       try {
@@ -107,35 +91,33 @@ class TaskService {
 
         this.validateStatusTransition(fromStatus, toStatus);
 
-        if (project.board_type === 'kanban') {
-          const [limitRows] = await connection.query(
-            `SELECT wip_limit
-             FROM kanban_column_limits
-             WHERE project_id = ? AND column_name = ?
-             FOR UPDATE`,
-            [project.id, toStatus]
-          );
-          const limitRow = limitRows[0];
+        const [limitRows] = await connection.query(
+          `SELECT wip_limit
+           FROM kanban_column_limits
+           WHERE team_id = ? AND column_name = ?
+           FOR UPDATE`,
+          [teamId, toStatus]
+        );
+        const limitRow = limitRows[0];
 
-          if (limitRow) {
-            const [countRows] = await connection.query(
-              `SELECT COUNT(*) AS total
-               FROM tasks
-               WHERE project_id = ? AND status = ?`,
-              [project.id, toStatus]
-            );
-            const currentCount = Number(countRows[0]?.total || 0);
-            if (currentCount >= Number(limitRow.wip_limit)) {
-              console.warn('[task_service_wip_violation]', {
-                projectId: project.id,
-                taskId,
-                toStatus,
-                currentCount,
-                wipLimit: Number(limitRow.wip_limit),
-                userId
-              });
-              throw { statusCode: 400, message: `WIP limit reached for column '${toStatus}'` };
-            }
+        if (limitRow) {
+          const [countRows] = await connection.query(
+            `SELECT COUNT(*) AS total
+             FROM tasks
+             WHERE team_id = ? AND sprint_id IS NULL AND status = ?`,
+            [teamId, toStatus]
+          );
+          const currentCount = Number(countRows[0]?.total || 0);
+          if (currentCount >= Number(limitRow.wip_limit)) {
+            console.warn('[task_service_wip_violation]', {
+              teamId,
+              taskId,
+              toStatus,
+              currentCount,
+              wipLimit: Number(limitRow.wip_limit),
+              userId
+            });
+            throw { statusCode: 400, message: `WIP limit reached for column '${toStatus}'` };
           }
         }
 
@@ -143,13 +125,12 @@ class TaskService {
           await Task.insertStatusHistory(taskId, fromStatus, toStatus, userId, connection);
         } catch (historyError) {
           if (this.isMissingTableError(historyError, 'task_status_history')) {
-            // Keep status transitions working even if migration is not yet applied.
             console.warn('[task_service_status_history_table_missing]', {
               taskId,
               fromStatus,
               toStatus,
               userId,
-              projectId: project?.id
+              teamId
             });
           } else {
             throw historyError;
@@ -167,7 +148,7 @@ class TaskService {
           taskId,
           toStatus,
           userId,
-          projectId: project?.id,
+          teamId,
           code: error?.code,
           errno: error?.errno,
           message: error?.message
@@ -179,20 +160,16 @@ class TaskService {
     }, 'applyStatusChangeWithHistory');
   }
 
-  static async ensureTeamAccess(project, user) {
+  static async ensureTeamIdAccess(teamId, user) {
     if (isAdmin(user)) return;
     const userTeams = await Project.getUserTeams(user.id);
-    if (!userTeams.includes(project.team_id)) {
+    if (!userTeams.includes(teamId)) {
       throw { statusCode: 403, message: 'Access denied.' };
     }
   }
 
   static async resolveAssignedTo(assignedTo, teamId) {
-    if (
-      assignedTo === '' ||
-      assignedTo === null ||
-      assignedTo === undefined
-    ) {
+    if (assignedTo === '' || assignedTo === null || assignedTo === undefined) {
       return null;
     }
 
@@ -208,7 +185,7 @@ class TaskService {
 
     const isMember = await Team.isMemberExists(teamId, assigneeId);
     if (!isMember) {
-      throw { statusCode: 400, message: 'Assigned user must be a member of the project team' };
+      throw { statusCode: 400, message: 'Assigned user must be a member of the team' };
     }
 
     return assigneeId;
@@ -232,6 +209,76 @@ class TaskService {
     return `${prefix}${maxSequence + 1}`;
   }
 
+  static async resolveTaskScope(taskData) {
+    const sprintId = taskData.sprint_id ? Number(taskData.sprint_id) : null;
+    const teamIdInput = taskData.team_id ? Number(taskData.team_id) : null;
+    const projectIdInput = taskData.project_id ? Number(taskData.project_id) : null;
+
+    if (sprintId) {
+      const sprint = await Sprint.findById(sprintId);
+      if (!sprint) {
+        throw { statusCode: 404, message: 'Sprint not found' };
+      }
+
+      let project = null;
+      if (projectIdInput) {
+        project = await Project.findById(projectIdInput);
+        if (!project || Number(project.team_id) !== Number(sprint.team_id)) {
+          throw { statusCode: 400, message: 'Project must belong to the sprint team' };
+        }
+      } else if (sprint.project_id) {
+        project = await Project.findById(sprint.project_id);
+      }
+
+      if (!project) {
+        const teamProjects = await Project.getByTeamId(sprint.team_id);
+        if (!teamProjects.length) {
+          throw { statusCode: 400, message: 'No project exists for this team' };
+        }
+        project = teamProjects[0];
+      }
+
+      return {
+        teamId: Number(sprint.team_id),
+        projectId: Number(project.id),
+        project
+      };
+    }
+
+    if (projectIdInput) {
+      const project = await Project.findById(projectIdInput);
+      if (!project) {
+        throw { statusCode: 404, message: 'Project not found' };
+      }
+      if (teamIdInput && Number(project.team_id) !== teamIdInput) {
+        throw { statusCode: 400, message: 'Project does not belong to selected team' };
+      }
+      return {
+        teamId: Number(project.team_id),
+        projectId: Number(project.id),
+        project
+      };
+    }
+
+    if (teamIdInput) {
+      const team = await Team.findById(teamIdInput);
+      if (!team) {
+        throw { statusCode: 404, message: 'Team not found' };
+      }
+      const teamProjects = await Project.getByTeamId(teamIdInput);
+      if (!teamProjects.length) {
+        throw { statusCode: 400, message: 'Create at least one project in this team before creating stories' };
+      }
+      return {
+        teamId: teamIdInput,
+        projectId: Number(teamProjects[0].id),
+        project: teamProjects[0]
+      };
+    }
+
+    throw { statusCode: 400, message: 'team_id or project_id or sprint_id is required' };
+  }
+
   static async checkSprintStatus(taskId) {
     const task = await Task.findById(taskId);
     if (task && task.sprint_id) {
@@ -241,19 +288,14 @@ class TaskService {
       }
     }
   }
+
   static async createTask(taskData, user) {
-    const { title, description, task_key, sprint_id, project_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date } = taskData;
-    const projectId = Number(project_id);
+    const { title, description, task_key, sprint_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date } = taskData;
+    const { teamId, projectId, project } = await this.resolveTaskScope(taskData);
 
-    // Validate project exists and user has access
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw { statusCode: 404, message: 'Project not found' };
-    }
-
-    const canManage = await canManageProject(project, user);
+    const canManage = await canManageTeam(teamId, user);
     if (!canManage) {
-      throw { statusCode: 403, message: 'Only admin or this team lead can create issues' };
+      throw { statusCode: 403, message: 'Only admin or this team lead can create stories' };
     }
 
     const allowedStatus = ['todo', 'in_progress', 'in_review', 'done'];
@@ -262,30 +304,27 @@ class TaskService {
       throw { statusCode: 400, message: 'Invalid status value' };
     }
 
-    // Validate sprint if provided
     if (sprint_id) {
       const sprint = await Sprint.findById(sprint_id);
-      if (!sprint || Number(sprint.project_id) !== projectId) {
-        throw { statusCode: 400, message: 'Invalid sprint for this project' };
+      if (!sprint || Number(sprint.team_id) !== teamId) {
+        throw { statusCode: 400, message: 'Invalid sprint for this team' };
       }
       if (sprint.status === 'completed') {
         throw { statusCode: 400, message: 'Cannot create a task in a completed sprint.' };
       }
     }
 
-    // Auto-generate key when client does not provide one
     let finalTaskKey = task_key ? String(task_key).trim().toUpperCase() : '';
     if (!finalTaskKey) {
       finalTaskKey = await this.generateTaskKey(projectId, project.key_code);
     }
 
-    // Check task key uniqueness
     const keyExists = await Task.isTaskKeyExists(finalTaskKey);
     if (keyExists) {
       throw { statusCode: 400, message: 'Task key already exists' };
     }
 
-    const finalAssignedTo = await this.resolveAssignedTo(assigned_to, project.team_id);
+    const finalAssignedTo = await this.resolveAssignedTo(assigned_to, teamId);
 
     const taskId = await Task.create({
       title,
@@ -293,6 +332,7 @@ class TaskService {
       task_key: finalTaskKey,
       sprint_id,
       project_id: projectId,
+      team_id: teamId,
       assigned_to: finalAssignedTo,
       reporter_id: user.id,
       status: finalStatus,
@@ -317,7 +357,7 @@ class TaskService {
       throw { statusCode: 404, message: 'Project not found' };
     }
 
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(project.team_id, user);
 
     return await Task.getByProjectId(projectId);
   }
@@ -328,10 +368,20 @@ class TaskService {
       throw { statusCode: 404, message: 'Sprint not found' };
     }
 
-    const project = await Project.findById(sprint.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(sprint.team_id), user);
 
     return await Task.getBySprintId(sprintId);
+  }
+
+  static async getTasksByTeam(teamId, user) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
+    }
+
+    await this.ensureTeamIdAccess(Number(teamId), user);
+
+    return await Task.getByTeamId(teamId);
   }
 
   static async getTaskById(taskId, user) {
@@ -340,8 +390,7 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
     const links = await Task.getLinks(taskId);
     const attachments = await Task.getAttachments(taskId);
@@ -356,9 +405,9 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
+    const project = task.project_id ? await Project.findById(task.project_id) : null;
     const adminAllowedFields = new Set([
       'title',
       'description',
@@ -376,7 +425,7 @@ class TaskService {
       'story_points',
       'status'
     ]);
-    const canManage = await canManageProject(project, user);
+    const canManage = project ? await canManageProject(project, user) : await canManageTeam(Number(task.team_id), user);
     const allowedFields = canManage ? adminAllowedFields : memberAllowedFields;
     const sanitized = {};
     Object.entries(taskData).forEach(([key, value]) => {
@@ -393,17 +442,13 @@ class TaskService {
     }
 
     if (Object.prototype.hasOwnProperty.call(sanitized, 'sprint_id')) {
-      if (
-        sanitized.sprint_id === '' ||
-        sanitized.sprint_id === null ||
-        sanitized.sprint_id === undefined
-      ) {
+      if (sanitized.sprint_id === '' || sanitized.sprint_id === null || sanitized.sprint_id === undefined) {
         sanitized.sprint_id = null;
       } else {
         const sprintId = Number(sanitized.sprint_id);
         const sprint = await Sprint.findById(sprintId);
-        if (!sprint || Number(sprint.project_id) !== Number(task.project_id)) {
-          throw { statusCode: 400, message: 'Invalid sprint for this task project' };
+        if (!sprint || Number(sprint.team_id) !== Number(task.team_id)) {
+          throw { statusCode: 400, message: 'Invalid sprint for this task team' };
         }
         if (sprint.status === 'completed') {
           throw { statusCode: 400, message: 'Cannot move a task into a completed sprint.' };
@@ -413,7 +458,7 @@ class TaskService {
     }
 
     if (Object.prototype.hasOwnProperty.call(sanitized, 'assigned_to')) {
-      sanitized.assigned_to = await this.resolveAssignedTo(sanitized.assigned_to, project.team_id);
+      sanitized.assigned_to = await this.resolveAssignedTo(sanitized.assigned_to, Number(task.team_id));
     }
 
     if (Object.keys(sanitized).length === 0) {
@@ -424,7 +469,7 @@ class TaskService {
     if (Object.prototype.hasOwnProperty.call(sanitized, 'status')) {
       const targetStatus = sanitized.status;
       delete sanitized.status;
-      const statusChanged = await this.applyStatusChangeWithHistory(taskId, targetStatus, user.id, project, sanitized);
+      const statusChanged = await this.applyStatusChangeWithHistory(taskId, targetStatus, user.id, Number(task.team_id), sanitized);
       if (statusChanged && task.assigned_to && Number(task.assigned_to) !== Number(user.id)) {
         await NotificationService.notifyTaskStatusChanged(task.assigned_to, task, targetStatus, user);
       }
@@ -452,15 +497,14 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
     const allowedStatus = ['todo', 'in_progress', 'in_review', 'done'];
     if (!allowedStatus.includes(status)) {
       throw { statusCode: 400, message: 'Invalid status value' };
     }
 
-    const statusChanged = await this.applyStatusChangeWithHistory(taskId, status, user.id, project);
+    const statusChanged = await this.applyStatusChangeWithHistory(taskId, status, user.id, Number(task.team_id));
     const updatedTask = await Task.findById(taskId);
     if (statusChanged && updatedTask.assigned_to && Number(updatedTask.assigned_to) !== Number(user.id)) {
       await NotificationService.notifyTaskStatusChanged(updatedTask.assigned_to, updatedTask, status, user);
@@ -475,8 +519,7 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    const canManage = await canManageProject(project, user);
+    const canManage = await canManageTeam(Number(task.team_id), user);
     if (!canManage) {
       throw { statusCode: 403, message: 'Only admin or this team lead can delete issues' };
     }
@@ -492,8 +535,7 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
     await Task.addLink(taskId, { ...linkData, added_by: user.id });
     return await Task.getLinks(taskId);
@@ -506,8 +548,7 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
     await Task.addAttachment(taskId, { ...attachmentData, uploaded_by: user.id });
     return await Task.getAttachments(taskId);
@@ -531,10 +572,9 @@ class TaskService {
       throw { statusCode: 404, message: 'Task not found' };
     }
 
-    const project = await Project.findById(task.project_id);
-    await this.ensureTeamAccess(project, user);
+    await this.ensureTeamIdAccess(Number(task.team_id), user);
 
-    const canManage = await canManageProject(project, user);
+    const canManage = await canManageTeam(Number(task.team_id), user);
     const isOwner = Number(attachment.uploaded_by) === Number(user.id);
     if (!canManage && !isOwner) {
       throw { statusCode: 403, message: 'You can only delete your own attachments' };

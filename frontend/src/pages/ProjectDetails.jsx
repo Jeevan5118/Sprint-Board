@@ -30,7 +30,7 @@ const ProjectDetails = () => {
             const projectData = await projectService.getProjectById(projectId);
             setProject(projectData);
 
-            const sprintsData = await sprintService.getSprintsByProject(projectId);
+            const sprintsData = await sprintService.getSprintsByTeam(projectData.team_id);
             setSprints(sprintsData);
         } catch (err) {
             console.error(err);
@@ -62,7 +62,7 @@ const ProjectDetails = () => {
             return;
         }
         try {
-            await sprintService.createSprint({ ...formData, name: formData.name.trim(), project_id: projectId });
+            await sprintService.createSprint({ ...formData, name: formData.name.trim(), team_id: project.team_id, project_id: projectId });
             setShowModal(false);
             setFormData({
                 name: '',
@@ -134,7 +134,7 @@ const ProjectDetails = () => {
                         </div>
                         <div className="flex items-center gap-3">
                             <Link
-                                to={`/projects/${projectId}/kanban`}
+                                to={`/teams/${project.team_id}/kanban`}
                                 className="btn-secondary flex items-center gap-2 hover:border-[#0052CC] hover:text-[#0052CC]"
                             >
                                 <span>Open Kanban Board</span>
@@ -195,7 +195,7 @@ const ProjectDetails = () => {
                         <div className="text-sm text-[#172B4D]">Open Kanban view for this project.</div>
                     </div>
                     <Link
-                        to={`/projects/${projectId}/kanban`}
+                        to={`/teams/${project.team_id}/kanban`}
                         className="btn-primary"
                     >
                         Open Kanban Board
@@ -246,7 +246,7 @@ const ProjectDetails = () => {
                                         </button>
                                     )}
                                     <Link
-                                        to={`/projects/${projectId}/sprints/${sprint.id}/board`}
+                                        to={`/teams/${project.team_id}/sprints/${sprint.id}/board`}
                                         className="btn-secondary flex items-center gap-2 hover:border-[#0052CC] hover:text-[#0052CC]"
                                     >
                                         <span>Open Board</span>

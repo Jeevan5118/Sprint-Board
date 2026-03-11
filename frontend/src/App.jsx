@@ -37,10 +37,28 @@ const App = () => {
         />
 
         <Route
+          path="/teams/:teamId/sprints/:sprintId/board"
+          element={
+            <ProtectedRoute>
+              <SprintBoard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/projects/:projectId/sprints/:sprintId/board"
           element={
             <ProtectedRoute>
               <SprintBoard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teams/:teamId/kanban"
+          element={
+            <ProtectedRoute>
+              <KanbanBoard />
             </ProtectedRoute>
           }
         />

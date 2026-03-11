@@ -9,6 +9,7 @@ const {
   attachmentIdValidator,
   projectIdValidator,
   sprintIdValidator,
+  teamIdValidator,
   addLinkValidator
 } = require('../validators/taskValidator');
 const validationMiddleware = require('../middlewares/validationMiddleware');
@@ -26,6 +27,9 @@ router.get('/project/:projectId', projectIdValidator, validationMiddleware, Task
 
 // Get tasks by sprint
 router.get('/sprint/:sprintId', sprintIdValidator, validationMiddleware, TaskController.getTasksBySprint);
+
+// Get tasks by team
+router.get('/team/:teamId', teamIdValidator, validationMiddleware, TaskController.getTasksByTeam);
 
 // Get task by ID
 router.get('/:id', taskIdValidator, validationMiddleware, TaskController.getTaskById);

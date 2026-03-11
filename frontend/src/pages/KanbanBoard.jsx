@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { taskService } from '../services/taskService';
 import TaskDetailDrawer from '../components/Board/TaskDetailDrawer';
@@ -40,7 +40,8 @@ const normalizeLimits = (data) => {
 };
 
 const KanbanBoard = () => {
-  const { projectId } = useParams();
+  const { projectId, teamId: routeTeamId } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -60,9 +61,21 @@ const KanbanBoard = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get(`/kanban/${projectId}`);
+      let resolvedTeamId = routeTeamId;
+      if (!resolvedTeamId && projectId) {
+        const proj = await api.get(`/projects/${projectId}`);
+        resolvedTeamId = proj.data?.data?.project?.team_id;
+      }
+      const res = await api.get(`/kanban/team/${resolvedTeamId}`);
       const payload = res.data?.data || {};
-      setProject(payload.project || null);
+      const pseudoProject = payload.project || {
+        id: projectId || `team-${resolvedTeamId}`,
+        name: payload.team?.name || 'Team Board',
+        key_code: 'TEAM',
+        team_id: Number(resolvedTeamId),
+        team_lead_id: payload.team?.team_lead_id
+      };
+      setProject(pseudoProject);
       setTasks(payload.tasks || []);
       setColumnLimits(normalizeLimits(payload));
     } catch (err) {
@@ -70,11 +83,22 @@ const KanbanBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, routeTeamId]);
 
   useEffect(() => {
     fetchBoard();
   }, [fetchBoard]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskId = Number(params.get('taskId'));
+    if (!Number.isInteger(taskId) || taskId <= 0) return;
+
+    const exists = tasks.some((t) => Number(t.id) === taskId);
+    if (exists) {
+      setSelectedTaskId(taskId);
+    }
+  }, [location.search, tasks]);
 
   const groupedTasks = useMemo(() => {
     return COLUMNS.reduce((acc, column) => {
@@ -177,9 +201,13 @@ const KanbanBoard = () => {
         <nav className="flex items-center gap-1 text-[13px] text-gray-400 mb-2">
           <Link to="/projects" className="hover:text-[#0052CC] transition-colors">Projects</Link>
           <span className="mx-1">/</span>
-          <Link to={`/projects/${projectId}`} className="hover:text-[#0052CC] transition-colors">
-            {project?.name || 'Project'}
-          </Link>
+          {projectId ? (
+            <Link to={`/projects/${projectId}`} className="hover:text-[#0052CC] transition-colors">
+              {project?.name || 'Project'}
+            </Link>
+          ) : (
+            <span className="text-gray-500">{project?.name || 'Team'}</span>
+          )}
           <span className="mx-1">/</span>
           <span className="text-gray-600 font-medium">Kanban Board</span>
         </nav>
@@ -287,6 +315,7 @@ const KanbanBoard = () => {
       {canManageProject && showCreateModal && (
         <CreateTaskModal
           projectId={projectId}
+          teamId={routeTeamId || project?.team_id}
           sprintId={null}
           initialStatus={initialCreateStatus}
           onClose={() => setShowCreateModal(false)}

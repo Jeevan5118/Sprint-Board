@@ -68,8 +68,7 @@ class Dashboard {
         (COUNT(*) - SUM(CASE WHEN tsk.status = 'done' THEN 1 ELSE 0 END)) as pending_tasks,
         SUM(CASE WHEN tsk.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_tasks
        FROM tasks tsk
-       INNER JOIN projects p ON p.id = tsk.project_id
-       WHERE p.team_id IN (
+       WHERE tsk.team_id IN (
          SELECT DISTINCT team_id
          FROM (
            SELECT tm.team_id
@@ -90,10 +89,10 @@ class Dashboard {
     const [rows] = await db.query(
       `SELECT
         (SELECT COUNT(*) FROM projects p WHERE p.team_id = ?) as total_projects,
-        (SELECT COUNT(*) FROM sprints s INNER JOIN projects p ON p.id = s.project_id WHERE p.team_id = ?) as total_sprints,
-        (SELECT COUNT(*) FROM sprints s INNER JOIN projects p ON p.id = s.project_id WHERE p.team_id = ? AND s.status = 'active') as active_sprints,
-        (SELECT COUNT(*) FROM tasks t INNER JOIN projects p ON p.id = t.project_id WHERE p.team_id = ?) as total_tasks,
-        (SELECT SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) FROM tasks t INNER JOIN projects p ON p.id = t.project_id WHERE p.team_id = ?) as completed_tasks`,
+        (SELECT COUNT(*) FROM sprints s WHERE s.team_id = ?) as total_sprints,
+        (SELECT COUNT(*) FROM sprints s WHERE s.team_id = ? AND s.status = 'active') as active_sprints,
+        (SELECT COUNT(*) FROM tasks t WHERE t.team_id = ?) as total_tasks,
+        (SELECT SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) FROM tasks t WHERE t.team_id = ?) as completed_tasks`,
       [teamId, teamId, teamId, teamId, teamId]
     );
     return rows[0];
@@ -146,6 +145,7 @@ class Dashboard {
         t.task_key,
         t.title AS task_title,
         t.project_id,
+        t.team_id,
         p.name AS project_name,
         p.key_code AS project_key,
         t.sprint_id,
@@ -169,12 +169,12 @@ class Dashboard {
           EXISTS (
             SELECT 1
             FROM team_members tm
-            WHERE tm.team_id = p.team_id AND tm.user_id = ?
+            WHERE tm.team_id = t.team_id AND tm.user_id = ?
           )
           OR EXISTS (
             SELECT 1
             FROM teams tt
-            WHERE tt.id = p.team_id AND tt.team_lead_id = ?
+            WHERE tt.id = t.team_id AND tt.team_lead_id = ?
           )
         )
       `;
@@ -194,12 +194,13 @@ class Dashboard {
         s.name AS sprint_name,
         s.status AS sprint_status,
         s.project_id,
+        s.team_id,
         p.name AS project_name,
         p.key_code AS project_key,
         s.end_date,
         DATEDIFF(s.end_date, CURDATE()) AS days_remaining
       FROM sprints s
-      INNER JOIN projects p ON p.id = s.project_id
+      LEFT JOIN projects p ON p.id = s.project_id
       WHERE s.end_date IS NOT NULL
         AND s.status IN ('planned', 'active')
         AND (
@@ -215,12 +216,12 @@ class Dashboard {
           EXISTS (
             SELECT 1
             FROM team_members tm
-            WHERE tm.team_id = p.team_id AND tm.user_id = ?
+            WHERE tm.team_id = s.team_id AND tm.user_id = ?
           )
           OR EXISTS (
             SELECT 1
             FROM teams tt
-            WHERE tt.id = p.team_id AND tt.team_lead_id = ?
+            WHERE tt.id = s.team_id AND tt.team_lead_id = ?
           )
         )
       `;

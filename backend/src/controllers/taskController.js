@@ -4,10 +4,10 @@ const FileStorageService = require('../services/fileStorageService');
 class TaskController {
   static async createTask(req, res, next) {
     try {
-      const { title, description, task_key, sprint_id, project_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date } = req.body;
+      const { title, description, task_key, sprint_id, project_id, team_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date } = req.body;
 
       const task = await TaskService.createTask(
-        { title, description, task_key, sprint_id, project_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date },
+        { title, description, task_key, sprint_id, project_id, team_id, assigned_to, status, type, priority, story_points, estimated_hours, due_date },
         req.user
       );
 
@@ -39,6 +39,20 @@ class TaskController {
     try {
       const { sprintId } = req.params;
       const tasks = await TaskService.getTasksBySprint(sprintId, req.user);
+
+      res.status(200).json({
+        success: true,
+        data: { tasks }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getTasksByTeam(req, res, next) {
+    try {
+      const { teamId } = req.params;
+      const tasks = await TaskService.getTasksByTeam(teamId, req.user);
 
       res.status(200).json({
         success: true,

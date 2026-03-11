@@ -1,6 +1,10 @@
 import api from './api';
 
 export const sprintService = {
+    getSprintsByTeam: async (teamId) => {
+        const response = await api.get(`/sprints/team/${teamId}`);
+        return response.data.data.sprints;
+    },
     getSprintsByProject: async (projectId) => {
         const response = await api.get(`/sprints/project/${projectId}`);
         return response.data.data.sprints;

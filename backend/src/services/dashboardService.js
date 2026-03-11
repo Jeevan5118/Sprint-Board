@@ -18,10 +18,9 @@ class DashboardService {
       throw { statusCode: 404, message: 'Sprint not found' };
     }
 
-    const project = await Project.findById(sprint.project_id);
     if (user.role !== 'admin') {
       const userTeams = await Project.getUserTeams(user.id);
-      if (!userTeams.includes(project.team_id)) {
+      if (!userTeams.includes(sprint.team_id)) {
         throw { statusCode: 403, message: 'Access denied.' };
       }
     }
@@ -189,6 +188,7 @@ class DashboardService {
       task_key: row.task_key,
       task_title: row.task_title,
       project_id: row.project_id,
+      team_id: row.team_id,
       project_name: row.project_name,
       project_key: row.project_key,
       sprint_id: row.sprint_id,
@@ -204,6 +204,7 @@ class DashboardService {
       sprint_name: row.sprint_name,
       sprint_status: row.sprint_status,
       project_id: row.project_id,
+      team_id: row.team_id,
       project_name: row.project_name,
       project_key: row.project_key,
       end_date: row.end_date,

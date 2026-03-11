@@ -4,7 +4,7 @@ import { teamService } from '../../services/teamService';
 import { taskService } from '../../services/taskService';
 import { getErrorMessage } from '../../utils/error';
 
-const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose, onTaskCreated }) => {
+const CreateTaskModal = ({ projectId, teamId, sprintId, initialStatus = 'todo', onClose, onTaskCreated }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -22,9 +22,13 @@ const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose,
     useEffect(() => {
         const fetchMembers = async () => {
             try {
-                const project = await projectService.getProjectById(projectId);
-                if (project.team_id) {
-                    const members = await teamService.getMembers(project.team_id);
+                let resolvedTeamId = teamId;
+                if (!resolvedTeamId && projectId) {
+                    const project = await projectService.getProjectById(projectId);
+                    resolvedTeamId = project.team_id;
+                }
+                if (resolvedTeamId) {
+                    const members = await teamService.getMembers(resolvedTeamId);
                     setTeamMembers(members);
                 }
             } catch (err) {
@@ -32,7 +36,7 @@ const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose,
             }
         };
         fetchMembers();
-    }, [projectId]);
+    }, [projectId, teamId]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -67,6 +71,7 @@ const CreateTaskModal = ({ projectId, sprintId, initialStatus = 'todo', onClose,
                 story_points: formData.story_points === '' ? null : Number(formData.story_points),
                 assigned_to: formData.assigned_to || null,
                 project_id: projectId,
+                team_id: teamId ? Number(teamId) : null,
                 sprint_id: sprintId ? Number(sprintId) : null
             });
             onTaskCreated();

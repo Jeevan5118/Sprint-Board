@@ -2,10 +2,10 @@ const db = require('../config/database');
 
 class Task {
   static async create(taskData) {
-    const { title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date } = taskData;
+    const { title, description, task_key, sprint_id, project_id, team_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date } = taskData;
     const [result] = await db.query(
-      'INSERT INTO tasks (title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date]
+      'INSERT INTO tasks (title, description, task_key, sprint_id, project_id, team_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [title, description, task_key, sprint_id, project_id, team_id, assigned_to, reporter_id, status, type, priority, story_points, estimated_hours, due_date]
     );
     return result.insertId;
   }
@@ -61,6 +61,24 @@ class Task {
     return rows;
   }
 
+  static async getByTeamId(teamId) {
+    const [rows] = await db.query(
+      `SELECT t.*, 
+        s.name as sprint_name,
+        s.status as sprint_status,
+        CONCAT(u1.first_name, ' ', u1.last_name) as assigned_to_name,
+        CONCAT(u2.first_name, ' ', u2.last_name) as reporter_name
+       FROM tasks t
+       LEFT JOIN sprints s ON t.sprint_id = s.id
+       LEFT JOIN users u1 ON t.assigned_to = u1.id
+       LEFT JOIN users u2 ON t.reporter_id = u2.id
+       WHERE t.team_id = ?
+       ORDER BY t.created_at DESC`,
+      [teamId]
+    );
+    return rows;
+  }
+
   static async getByAssigneeAndTeam(userId, teamId) {
     const [rows] = await db.query(
       `SELECT t.id, t.task_key, t.title, t.status, t.priority, t.type, t.story_points,
@@ -111,18 +129,18 @@ class Task {
     return result.affectedRows;
   }
 
-  static async getKanbanColumnLimit(projectId, columnName, executor = db) {
+  static async getKanbanColumnLimit(teamId, columnName, executor = db) {
     const [rows] = await executor.query(
-      'SELECT wip_limit FROM kanban_column_limits WHERE project_id = ? AND column_name = ? LIMIT 1',
-      [projectId, columnName]
+      'SELECT wip_limit FROM kanban_column_limits WHERE team_id = ? AND column_name = ? LIMIT 1',
+      [teamId, columnName]
     );
     return rows[0] || null;
   }
 
-  static async countTasksByProjectAndStatus(projectId, status, executor = db) {
+  static async countTasksByTeamAndStatus(teamId, status, executor = db) {
     const [rows] = await executor.query(
-      'SELECT COUNT(*) AS total FROM tasks WHERE project_id = ? AND status = ?',
-      [projectId, status]
+      'SELECT COUNT(*) AS total FROM tasks WHERE team_id = ? AND sprint_id IS NULL AND status = ?',
+      [teamId, status]
     );
     return Number(rows[0]?.total || 0);
   }

@@ -1,767 +1,398 @@
-# Scrum Board Project
+# SprintBoard
 
-A full-stack Agile project management application inspired by Jira.
+Enterprise Agile project management platform with Scrum + Kanban support, team-scoped RBAC, task collaboration, notifications, attachments, and analytics.
 
-This project helps teams manage:
-- teams and members
-- projects and sprints
-- sprint board tasks (backlog, todo, in progress, review, done)
-- task details (story points, assignee, comments, links, attachments)
-- user dashboard metrics
+## 1. What This Project Is
+SprintBoard is a full-stack web application for managing teams, projects, sprints, and tasks.
 
-## What Is In This Repo
+- Frontend: React (CRA), React Router, Axios, Tailwind CSS
+- Backend: Node.js, Express, MySQL
+- Auth: JWT
+- Roles: `admin`, `team_lead`, `member`
+- Access model: team-scoped authorization
 
-- `frontend/`: React application (CRA + React Router + Axios + Tailwind CSS)
-- `backend/`: Node.js + Express REST API with MySQL
+## 2. Repository Structure
 
-## Core Features
+- `frontend/` - React UI
+- `backend/` - Express API + business logic + DB access
+- `backend/database/` - schema and seed SQL
+- `backend/migrations/` - migration files
+- `api/[...all].js` - Vercel serverless entry for backend
+- `.github/workflows/` - CI workflows
+- `e2e/` + `playwright.config.js` - Playwright automation
 
-- Authentication with JWT (`admin`, `team_lead`, and `member` roles)
-- Team-based access control across projects, sprints, and tasks
-- Sprint board with drag-and-drop task movement
-- Timeline roadmap page with project/sprint planning view (`/timeline`)
-- Task detail drawer with:
-  - story points update
-  - assignee update
-  - comments
-  - links
-  - attachments
-- Team management UI
-- Dashboard summary for logged-in user
+## 3. Main Features Implemented
 
-## Access Rules (Important)
+### Core Platform
+- JWT authentication and protected routes
+- Role-based authorization (`admin`, `team_lead`, `member`)
+- Team-scoped data access across projects/sprints/tasks/comments
+- Dashboard metrics and team/project progress summaries
+- Notifications for task assignment events
+- File attachments for tasks (Cloudinary-backed support)
 
-- `admin` can manage teams, projects, and sprint lifecycle actions.
-- Each team has a single `team_lead` (`teams.team_lead_id`).
-- `team_lead` can manage projects, sprints, tasks, comments, and team members for their own team only.
-- `member` can access data only for teams they belong to.
-- `admin` can create, edit, assign, and delete issues on Sprint Board.
-- `member` can move issues (drag/drop), update status/story points, and add comments/links/attachments.
-- Scope difference: `admin` can do this across all accessible projects; `member` only within their own team projects.
-- Members now see only their own teams in Teams screen (`/api/teams/my`).
-- Members can read team members for their own team (`/api/teams/:id/members`), but not other teams.
+### Team Management
+- Create, edit, and delete teams (admin)
+- Add/remove team members
+- Set/remove one team lead per team
+- Team lead assignment is done **after** team creation
 
-## Current Implemented Features (Verified)
+### Project Management
+- Create/list/view/delete projects
+- Project grouping by team in admin projects view
+- Project board mode support via `board_type` (`scrum` / `kanban`)
+- Project details page with sprint lifecycle + Kanban entry
 
-> This section reflects the current behavior implemented in code.
+### Scrum
+- Sprint creation/start/complete
+- Sprint board with columns and drag/drop status movement
+- Task creation and issue details drawer
+- Task comments, links, attachments
 
-### Platform Features
-- JWT authentication with protected routes and logout/session clearing.
-- Role-based access with `admin`, `team_lead`, and `member`.
-- Team-based data scoping across teams, projects, sprints, tasks, and comments.
-- Sprint board with drag-and-drop task movement across backlog and workflow columns.
-- Timeline roadmap page with project/sprint ranges, filters, and zoom controls.
-- Task detail drawer with full issue editing (role-scoped), assignee management, story points, comments, links, and attachments.
-- Dashboard endpoints and UI for user/team/project/sprint summaries.
-- Assignment notifications with unread list and mark-read/mark-all-read.
-- Validation middleware, centralized error handling, CORS, Helmet, and request logging.
-- MySQL schema + seed + migration support and CI build/authz checks.
+### Kanban
+- Dedicated route: `/projects/:projectId/kanban`
+- Only valid for projects configured as Kanban
+- WIP limit enforcement with transactional checks
+- Status history tracking for workflow analytics
+- Kanban analytics endpoint for lead/cycle/throughput metrics
 
-### Role Capability Matrix (Current)
+### Time Logging
+- Add/list/delete time logs per task
+- RBAC deletion rules enforced (owner/admin/team_lead in scope)
+
+### Admin CSV Import
+- Admin-only bulk CSV import endpoint
+- Supports employees, teams, projects, and team_members import types
+- Employee import can auto-create missing teams/projects and map users
+
+## 4. Role Access Matrix
 
 | Capability | Admin | Team Lead | Member |
 |---|---|---|---|
 | Login / Logout | Yes | Yes | Yes |
-| Register | No (provisioned) | No | Yes |
-| View Teams | All | Own teams | Own teams |
-| Create Team | Yes | No | No |
-| Set Team Lead (existing team) | Yes | No | No |
-| Add Members | Yes | Yes (own team only) | No |
-| Remove Members | Yes | Yes (own team only) | No |
-| View Projects | All | Team-scoped | Team-scoped |
-| Create Project | Yes | Yes (own team only) | No |
-| Delete Project | Yes | Yes (own team only) | No |
-| Create Sprint | Yes | Yes (own team project only) | No |
-| Start/Complete Sprint | Yes | Yes (own team project only) | No |
-| Open Sprint Board | Yes | Yes (team-scoped) | Yes (team-scoped) |
-| Create Task | Yes | Yes (own team project only) | No |
-| Edit Full Task Fields | Yes | Yes (own team project only) | No |
-| Move Task / Update Status | Yes | Yes | Yes (team-scoped) |
-| Delete Task | Yes | Yes (own team project only) | No |
-| Add Comment / Link / Attachment | Yes | Yes | Yes (team-scoped) |
-| Delete Any Comment | Yes | Yes (own team project only) | No |
-| Delete Own Comment | Yes | Yes | Yes |
-| Access `GET /api/auth/users` | Yes | No | No |
-| Assignment Notifications | Optional | Yes | Yes |
+| Update own email/password | Yes | Yes | Yes |
+| Create user accounts | Yes | No | No |
+| Create/Edit/Delete teams | Yes | No | No |
+| Set/Remove team lead | Yes | No | No |
+| Add/Remove team members | Yes | Yes (own managed team scope) | No |
+| Create/Delete projects | Yes | Yes (team scope) | No |
+| Create/Start/Complete sprints | Yes | Yes (team scope) | No |
+| Use Sprint Board | Yes | Yes | Yes (scope-limited) |
+| Create tasks | Yes | Yes (scope-limited) | No |
+| Move tasks (drag/drop) | Yes | Yes | Yes (scope-limited) |
+| View/Use Kanban board | Yes | Yes | Yes (scope-limited, kanban projects only) |
+| Use CSV import | Yes | No | No |
+
+## 5. User Manual (How To Use)
+
+## 5.1 Login
+1. Open the app URL.
+2. Go to `Login`.
+3. Enter your email and password.
+4. On success, you are redirected to Dashboard.
+
+Notes:
+- Account creation is controlled by admin (no open public signup flow).
+- If token expires, app redirects to login automatically.
+
+## 5.2 Dashboard
+- View total/completed/pending/progress cards.
+- View team/project progress tables.
+- Use sidebar links to navigate to Projects, Timeline, Teams, Sprint Board, and Kanban Board.
+
+## 5.3 Teams
+Admin can:
+1. Open `Teams`.
+2. Create a new team (without selecting lead during creation).
+3. Add members to the team.
+4. Set one member as team lead using team member actions.
+5. Remove lead and assign another lead when needed.
+6. Edit team name/description.
+7. Delete team when required.
+
+Team lead can:
+- Manage members for allowed team scope.
+
+Member can:
+- View only their own team data.
+
+## 5.4 Projects
+1. Open `Projects`.
+2. Admin/team lead can create new projects.
+3. Fill project name, key, team, dates, description.
+4. Open a project row to go to Project Details.
+
+In Project Details:
+- Create sprints
+- Start/complete sprints
+- Open Sprint Board
+- Open Kanban Board (`Open Kanban Board` button)
+
+## 5.5 Scrum Board Workflow
+Route format:
+- `/projects/:projectId/sprints/:sprintId/board`
+
+Typical flow:
+1. Create sprint and start sprint.
+2. Create task/issue in sprint board.
+3. Open issue details drawer to update assignee, points, comments, links, attachments.
+4. Drag and drop cards across columns.
+5. Complete sprint when done.
+
+## 5.6 Kanban Board Workflow
+Route format:
+- `/projects/:projectId/kanban`
+
+How it works:
+1. Project must be Kanban board type.
+2. Open Kanban from Project Details.
+3. Move tasks across columns via drag/drop.
+4. WIP limits are validated by backend.
+5. If limit exceeded, move is blocked and error is returned.
+
+## 5.7 Timeline
+- Open `Timeline` from sidebar.
+- View sprint/project timeline with color-coded status.
+- Click a sprint item to open sprint details/board (as configured in UI).
+
+## 5.8 Account Page
+Route:
+- `/account`
+
+All users can:
+- Change their own email
+- Change their own password (current password required)
+
+Admin additionally sees:
+- `Create Employee Account` form
+- Fields: member name, email, password, team, role
+
+## 5.9 CSV Import (Admin)
+Location:
+- Projects page -> `Import CSV`
+
+Endpoint:
+- `POST /api/admin/import/csv`
 
-## Admin vs Team Lead vs Member Quick Sheet
+Upload form fields:
+- `import_type`: `employees` | `teams` | `projects` | `team_members`
+- `file`: CSV file
 
-### Admin
-- Login/logout.
-- View all teams, projects, sprints, tasks.
-- Create teams, add/remove members.
-- Create/delete projects.
-- Create/start/complete sprints.
-- Create issues.
-- Edit full issue fields (title, description, type, priority, due date, status, assignee, story points).
-- Move issues using drag/drop.
-- Delete issues.
-- Add comments, delete any comment.
-- Add links and attachments.
-- Access `GET /api/auth/users`.
-
-### Team Lead
-- View only projects/boards in teams they belong to.
-- Manage only teams where they are assigned as `team_lead_id`.
-- Can create/delete projects in their own team.
-- Can create/start/complete sprints in their own team projects.
-- Can create/edit/delete tasks in their own team projects.
-- Can update assignees and full issue fields in their own team projects.
-- Can add/remove members in their own team.
-- Can delete any comment in their own team projects.
-
-### Member
-- Register/login/logout.
-- No team selection at registration.
-- Sees data only after admin adds member to a team.
-- View only own teams, team projects, team sprints, team tasks.
-- Open sprint board for accessible projects.
-- Move issues using drag/drop.
-- Update status and story points.
-- Add comments, delete only own comments.
-- Add links and attachments.
-- Cannot create issue.
-- Cannot delete issue.
-- Cannot edit full issue fields (title/description/type/priority/due date/assignee).
-- Receives assignment notifications in navbar.
-
-## Application Structure and Flow
-
-### Main Navigation (After Login)
-- `Dashboard` (`/`)
-- `Projects` (`/projects`)
-- `Timeline` (`/timeline`)
-- `Teams` (`/teams`)
-- `Sprint Board` (`/projects/:projectId/sprints/:sprintId/board`)
-
-### Authentication Flow
-1. User opens `Login` or `Register`.
-2. On success, JWT token and user data are stored.
-3. User is redirected to `Dashboard`.
-4. All protected routes require valid login.
-5. On logout, token/user are cleared and user returns to login.
-
-### Timeline Module (`/timeline`)
-- Jira-style roadmap view across projects and their sprints.
-- Uses existing project/sprint APIs and team-based access control.
-- Shows project rows with sprint bars plotted by start/end dates.
-- Supports:
-  - search (project/sprint)
-  - project filter
-  - sprint status filter (`planned`, `active`, `completed`, `cancelled`)
-  - zoom levels (`week`, `month`, `quarter`)
-  - current-day marker for execution context
-
-## Role-Based Capabilities
-
-### Admin End-to-End Flow
-1. Login -> Dashboard.
-2. `Teams`:
-- View all teams.
-- Create team.
-- View members of any team.
-- Add/remove members.
-3. `Projects`:
-- View all projects.
-- Create project.
-- Open project details.
-- Delete project.
-4. `Project Details`:
-- Create sprint.
-- Start sprint.
-- Complete sprint.
-- Open sprint board.
-5. `Sprint Board`:
-- Create issue.
-- Drag/drop tasks between backlog and workflow columns.
-- Open issue details.
-6. `Issue Details`:
-- Edit issue fields.
-- Change assignee.
-- Update story points.
-- Add/delete comments.
-- Add links.
-- Upload attachments.
-- Delete issue.
-
-### Team Lead End-to-End Flow
-1. Login -> Dashboard.
-2. `Teams`:
-- View own teams.
-- Manage members only in teams where user is assigned as `team_lead_id`.
-3. `Projects`:
-- View team-scoped projects.
-- Create project only for own team.
-- Delete project only for own team.
-4. `Project Details`:
-- Create sprint in own team projects.
-- Start/complete sprint in own team projects.
-- Open sprint board.
-5. `Sprint Board`:
-- Create issue.
-- Drag/drop tasks and move between backlog/workflow.
-- Open issue details.
-6. `Issue Details`:
-- Edit full issue fields in own team projects.
-- Change assignee.
-- Update story points.
-- Add/delete comments.
-- Add links and upload attachments.
-- Delete issue.
-7. `Timeline`:
-- View roadmap timeline for team-scoped projects and sprints.
-
-### Member End-to-End Flow
-1. Register/Login -> Dashboard.
-2. `Teams`:
-- See only own teams.
-- View members only for own teams.
-3. `Projects`:
-- See only projects of teams they belong to.
-- Open project details.
-4. `Project Details`:
-- View sprints.
-- Open sprint board.
-5. `Sprint Board`:
-- Move issues (drag/drop).
-- Update status and story points.
-- Search and filter "Only my issues".
-6. `Issue Details`:
-- View issue fields.
-- Update story points.
-- Add comments.
-- Delete own comments.
-- Add links and attachments.
-- Cannot create/delete issue or edit full issue fields.
-7. `Notifications`:
-- When assigned a task, member sees unread notification in navbar.
-- Can mark single or all notifications as read.
-
-### Capability Matrix
-
-| Category | Admin | Team Lead | Member |
-|---|---|---|---|
-| Login/Logout | Yes | Yes | Yes |
-| Register | No (admin is provisioned) | No | Yes (member only) |
-| Dashboard | Yes | Yes | Yes |
-| View teams | All teams | Own teams | Own teams only |
-| Create team | Yes | No | No |
-| Set team lead (existing team) | Yes | No | No |
-| Add members | Yes | Yes (own team only) | No |
-| Remove members | Yes | Yes (own team only) | No |
-| View projects | All projects | Team-scoped | Team-scoped |
-| Create/delete project | Yes | Yes (own team only) | No |
-| View project details | Yes | Yes (team-scoped) | Yes (team-scoped) |
-| Create sprint | Yes | Yes (own team projects) | No |
-| Start/complete sprint | Yes | Yes (own team projects) | No |
-| Open sprint board | Yes | Yes (team-scoped) | Yes (team-scoped) |
-| Create tasks | Yes | Yes (own team projects) | No |
-| Update tasks | Yes (full) | Yes (full in own team projects) | Limited (`status`, `story_points`, sprint movement) |
-| Delete tasks | Yes | Yes (own team projects) | No |
-| Move task status (drag/drop) | Yes | Yes | Yes |
-| Assign/reassign task | Yes | Yes (own team projects) | No |
-| Add comments | Yes | Yes | Yes |
-| Delete comments | Any comment | Any comment (own team projects) | Own comments only |
-| Add links/attachments | Yes | Yes | Yes |
-| Timeline access (`/timeline`) | Yes | Yes (team-scoped) | Yes (team-scoped) |
-| Assignment notifications | Optional | Shown in navbar | Shown in navbar |
-
-## Complete Functionalities (Detailed, With Duplicates Kept Intentionally)
-
-> Note: This section contains detailed legacy breakdowns and may duplicate items.
-> The canonical up-to-date capability list is in:
-> - `Current Implemented Features (Verified)`
-> - `Role Capability Matrix (Current)`
-> - `Capability Matrix` (above)
-
-### 1. Authentication Module
-
-#### Admin
-- Open Login page.
-- Admin account is provisioned by seed/manual setup.
-- Login with email and password.
-- JWT token is generated after successful login.
-- User data + token are stored in local storage.
-- Access protected routes after login.
-- Auto-redirect to login on unauthorized token/session.
-- Logout from navbar.
-
-#### Member
-- Open Login page.
-- Open Register page.
-- Register account as `member` only.
-- Team is not selected in registration.
-- Until admin adds member to a team, member cannot access team/project/sprint data.
-- Login with email and password.
-- JWT token is generated after successful login.
-- User data + token are stored in local storage.
-- Access protected routes after login.
-- Auto-redirect to login on unauthorized token/session.
-- Logout from navbar.
-
-### 2. Dashboard Module
-
-#### Admin
-- View dashboard summary cards:
-  - Total Tasks
-  - Completed
-  - Pending
-  - Progress %
-- Click Progress card to open pie chart popup.
-- Click Total/Completed/Pending cards to open category-wise detail modal.
-- View team-wise and project-wise progress table.
-- View project done/pending/total and progress bar details.
-
-#### Member
-- View dashboard summary cards:
-  - Total Tasks
-  - Completed
-  - Pending
-  - Progress %
-- Click Progress card to open pie chart popup.
-- Click Total/Completed/Pending cards to open category-wise detail modal.
-- View team-wise and project-wise progress table.
-- View project done/pending/total and progress bar details.
-
-### 3. Teams Module
-
-#### Admin
-- View all teams.
-- Search teams.
-- Pagination in teams list.
-- Create team.
-- Expand team row to view team members.
-- Add member to team.
-- Remove member from team.
-- View member details (name, email, role visuals).
-
-#### Member
-- View only own teams (`/api/teams/my`).
-- Search teams.
-- Pagination in teams list.
-- Expand team row to view team members.
-- View member details (name, email, role visuals).
-- Cannot create team.
-- Cannot add/remove members.
-
-### 4. Projects Module
-
-#### Admin
-- View all projects.
-- Search projects.
-- Pagination in projects table.
-- Create project with:
-  - Name
-  - Key
-  - Description
-  - Team
-  - Start date
-  - End date
-- Project key validation.
-- Date validation.
-- Open project details.
-- Delete project.
-
-#### Member
-- View only team-based accessible projects.
-- Search projects.
-- Pagination in projects table.
-- Open project details.
-- Cannot create project.
-- Cannot delete project.
-
-### 5. Project Details + Sprint Lifecycle
-
-#### Admin
-- View project header, key, description, duration, status, sprint count.
-- View all sprints in project timeline.
-- Create sprint.
-- Start planned sprint.
-- Complete active sprint.
-- Open sprint board from sprint row.
-
-#### Member
-- View project header, key, description, duration, status, sprint count.
-- View all sprints in project timeline.
-- Open sprint board from sprint row.
-- Sprint create/start/complete actions are hidden in UI.
-
-### 6. Sprint Board Module
-
-#### Admin
-- Open sprint board for a project sprint.
-- View columns:
-  - Backlog
-  - To Do
-  - In Progress
-  - Review
-  - Done
-- Create issue from top button or quick-create in a column.
-- Drag and drop tasks:
-  - Backlog -> board
-  - board -> board
-  - board -> backlog
-- Search tasks by title/key.
-- Toggle "Only my issues".
-- Open issue detail drawer.
-- See task assignee avatars, story points, priority/type indicators.
-
-#### Member
-- Open sprint board for accessible project sprint.
-- View columns:
-  - Backlog
-  - To Do
-  - In Progress
-  - Review
-  - Done
-- Drag and drop tasks:
-  - Backlog -> board
-  - board -> board
-  - board -> backlog
-- Search tasks by title/key.
-- Toggle "Only my issues".
-- Open issue detail drawer.
-- See task assignee avatars, story points, priority/type indicators.
-
-### 7. Issue Creation Module
-
-#### Admin
-- Create issue with:
-  - Summary (title)
-  - Description
-  - Type
-  - Priority
-  - Assignee
-  - Story points
-  - Due date
-- Validate required title.
-- Validate non-negative story points.
-- Validate due date not in past.
-- Auto-generate task key if not provided.
-- Assignee must belong to project team.
-
-#### Member
-- Create issue is not allowed for member.
-
-### 8. Issue Detail Drawer Module
-
-#### Admin
-- Open task detail drawer.
-- View task key/title/description.
-- Edit issue fields:
-  - Title
-  - Description
-  - Type
-  - Priority
-  - Status
-  - Due date
-- Change assignee (including unassign).
-- Update story points.
-- View comments list.
-- Add comment.
-- Delete any comment.
-- View attachments.
-- Upload attachment (type/size checked in UI).
-- View links.
-- Add link.
-- Delete task.
-
-#### Member
-- Open task detail drawer.
-- View task key/title/description.
-- Cannot edit full issue fields.
-- Cannot change assignee.
-- Update story points.
-- Update status (including drag/drop on board).
-- View comments list.
-- Add comment.
-- Delete own comment only.
-- View attachments.
-- Upload attachment (type/size checked in UI).
-- View links.
-- Add link.
-- Cannot delete task.
-
-### 9. Notification Module (Task Assignment)
-
-#### Admin
-- Assignment notification is created when task is assigned/reassigned to a user.
-- Admin navbar currently does not show member notification dropdown.
-
-#### Member
-- When a task is assigned to the member, unread notification appears in navbar.
-- Notification count badge displayed.
-- Open notification panel.
-- View assigned-task notifications with timestamp.
-- Mark single notification as read.
-- Mark all notifications as read.
-
-### 10. Access Control and Security Behavior
-
-#### Admin
-- Full cross-team visibility/access for core modules.
-- Can manage teams/projects/sprint lifecycle.
-- Can fetch all users (admin endpoint).
-- Can delete any comment.
-
-#### Member
-- Team-based access enforced for projects, sprints, tasks, comments, dashboard.
-- Can only view teams they belong to.
-- Can only view team members of own teams.
-- Cannot use admin-only team/project lifecycle actions.
-- Cannot create/delete tasks.
-- Cannot update task title/description/type/priority/assignee/due date.
-- Cannot delete others' comments.
-
-### 11. API Groups (Functional Summary)
-
-#### Auth
-- Register
-- Login
-- Profile
-- All users (admin)
-
-#### Teams
-- My teams
-- Team members (team-scoped for member)
-- Team member assigned tasks (`/api/teams/:id/members/:userId/tasks`)
-- Available members not in any team (`/api/teams/available-members/list`, admin)
-- Create team (admin)
-- Add/remove member (admin)
-
-#### Projects
-- List projects (team filtered for member)
-- Get project details
-- Create project (admin)
-- Delete project (admin)
-
-#### Sprints
-- Create sprint
-- Get sprints by project
-- Get sprint by id
-- Start sprint
-- Complete sprint
-
-#### Tasks
-- Get by project
-- Get by sprint
-- Get by id
-- Create task (admin)
-- Update task (admin full, member limited)
-- Update task status
-- Delete task (admin)
-- Add links
-- Add attachments
-
-#### Comments
-- Add comment
-- Get task comments
-- Delete comment
-
-#### Dashboard
-- User dashboard
-- Sprint dashboard
-- Project dashboard
-- Team dashboard
-- Team-project progress
-
-#### Notifications
-- Get unread notifications
-- Mark one as read
-- Mark all as read
-
-## Tech Stack
-
-### Frontend
-- React 18
-- React Router DOM
-- Axios
-- Tailwind CSS
-
-### Backend
-- Node.js
-- Express
-- MySQL (`mysql2`)
-- JWT (`jsonwebtoken`)
-- Password hashing (`bcryptjs`)
-- Validation (`express-validator`)
-
-## Database (High Level)
-
-Main tables:
-- `users`
-- `teams`
-- `team_members`
-- `projects`
-- `sprints`
-- `tasks`
-- `comments`
-- `task_links`
-- `task_attachments`
-
-SQL files:
-- `backend/database/schema.sql`
-- `backend/database/seeds.sql`
-
-## How To Run Locally
-
-## 1. Prerequisites
-
-- Node.js 16+
-- MySQL server
-
-## 2. Backend Setup
-
-1. Go to backend:
-```bash
-cd backend
-```
-2. Install dependencies:
-```bash
-npm install
-```
-3. Create `.env` file (see `backend/src/config/env.js` for required keys):
-- `PORT`
-- `DB_HOST`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
-- `DB_PORT`
-- `JWT_SECRET`
-- `JWT_EXPIRE`
-- `CLIENT_URL`
-4. Create DB schema and seed data:
-```bash
-mysql -u <user> -p < database/schema.sql
-mysql -u <user> -p < database/seeds.sql
-```
-5. Start backend:
-```bash
-npm run dev
+### Recommended Employee CSV format
+```csv
+name,email,password,team,projects,role
+John Doe,john@example.com,Password@123,Team A,"Project One;Project Two",member
 ```
 
-## 3. Frontend Setup
+Behavior for `employees` import:
+- Creates user if not existing
+- Adds user to team
+- Creates team if missing
+- Creates listed projects for team if missing
+- Adds user to project membership
+- Supports `role` (`member` default, `team_lead` optional)
 
-1. Go to frontend:
-```bash
-cd frontend
-```
-2. Install dependencies:
-```bash
-npm install
-```
-3. Start frontend:
-```bash
-npm start
-```
+## 6. API Overview (High-Level)
 
-Default frontend URL:
-- `http://localhost:3000`
-
-Backend API base URL in frontend:
-- `frontend/src/services/api.js` (currently points to `http://localhost:5001/api`)
-  - You can override via env: `REACT_APP_API_URL`
-  - Example in `frontend/.env`:
-    - `REACT_APP_API_URL=http://localhost:5001/api`
-
-## Smoke Tests
-
-- Frontend smoke flow:
-```bash
-cd frontend
-npm run test:smoke
-```
-
-- Backend smoke flow:
-```bash
-cd backend
-npm run test:smoke
-```
-
-## CI and Release Process
-
-### CI Workflow
-- GitHub Actions workflow: `.github/workflows/ci.yml`
-- Runs on push/PR to `main`/`master`
-- Validates:
-  - backend install + DB setup + migrations
-  - backend auth/authorization checks (`npm run test:authz`)
-  - frontend production build (`npm run build`)
-
-### Run CI-Equivalent Checks Locally (Before Deployment)
-
-1. Backend checks:
-```bash
-cd backend
-npm ci
-npm run migrate
-npm run test:authz
-```
-
-2. Frontend checks:
-```bash
-cd frontend
-npm ci
-npm run build
-```
-
-### Production Readiness Documents
-- Release checklist: `docs/PROD_RELEASE_CHECKLIST.md`
-- Rollback SOP: `docs/ROLLBACK_SOP.md`
-
-## Main API Groups
+### Health
+- `GET /api/health`
 
 ### Auth
-- `POST /api/auth/register`
 - `POST /api/auth/login`
+- `GET /api/auth/profile`
+- `PATCH /api/auth/profile`
+- `POST /api/auth/users` (admin create user)
 - `GET /api/auth/users` (admin)
 
 ### Teams
-- `GET /api/teams/my` (authenticated, returns only user's teams)
-- `GET /api/teams/:id/members` (authenticated, restricted by team membership for members)
-- `GET /api/teams/:id/members/:userId/tasks` (team member assigned tasks)
-- `GET /api/teams/available-members/list` (admin)
+- `GET /api/teams`
+- `GET /api/teams/my`
+- `GET /api/teams/:id`
+- `GET /api/teams/:id/members`
 - `POST /api/teams` (admin)
-- `POST /api/teams/:id/members` (admin)
-- `DELETE /api/teams/:id/members/:userId` (admin)
+- `PATCH /api/teams/:id` (admin)
+- `DELETE /api/teams/:id` (admin)
+- `POST /api/teams/:id/members`
+- `DELETE /api/teams/:id/members/:userId`
+- `PATCH /api/teams/:id/lead` (admin)
+- `DELETE /api/teams/:id/lead` (admin)
 
-### Projects
+### Projects / Sprints / Tasks
 - `GET /api/projects`
+- `POST /api/projects`
 - `GET /api/projects/:id`
-- `POST /api/projects` (admin)
-- `DELETE /api/projects/:id` (admin)
-
-### Sprints
+- `DELETE /api/projects/:id`
 - `GET /api/sprints/project/:projectId`
-- `GET /api/sprints/:id`
 - `POST /api/sprints`
 - `PATCH /api/sprints/:id/start`
 - `PATCH /api/sprints/:id/complete`
-
-### Tasks
-- `GET /api/tasks/project/:projectId`
 - `GET /api/tasks/sprint/:sprintId`
-- `GET /api/tasks/:id`
-- `POST /api/tasks` (admin)
-- `PUT /api/tasks/:id` (admin full, member limited)
+- `PUT /api/tasks/:id`
 - `PATCH /api/tasks/:id/status`
-- `DELETE /api/tasks/:id` (admin)
-- `POST /api/tasks/:id/links`
-- `POST /api/tasks/:id/attachments`
 
-### Comments / Dashboard
-- `GET /api/comments/task/:taskId`
-- `POST /api/comments/task/:taskId`
-- `DELETE /api/comments/:id`
-- `GET /api/dashboard/user`
+### Kanban / Analytics / Time Logs
+- `GET /api/kanban/:projectId`
+- `GET /api/analytics/kanban/:projectId`
+- `POST /api/tasks/:id/time-logs`
+- `GET /api/tasks/:id/time-logs`
+- `DELETE /api/time-logs/:id`
 
-## Useful Notes
+## 7. Local Setup
 
-- If frontend behaves unexpectedly after backend changes, restart backend server.
-- If API auth fails, clear browser local storage token/user and login again.
-- For quick API health check:
-  - `GET /api/health`
+## 7.1 Prerequisites
+- Node.js 18+
+- npm
+- MySQL 8+
 
-## License
+## 7.2 Backend
+```bash
+cd backend
+npm install
+```
 
-For learning and internal project use.
+Create `backend/.env`:
+```env
+PORT=5001
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=scrum_board
+JWT_SECRET=your_long_random_secret
+JWT_EXPIRE=7d
+CLIENT_URL=http://localhost:3000
+
+# Optional Cloudinary
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+Load schema and seed:
+```bash
+# from project root in PowerShell
+Get-Content .\backend\database\schema.sql | mysql -h localhost -P 3306 -u root -p scrum_board
+Get-Content .\backend\database\seeds.sql | mysql -h localhost -P 3306 -u root -p scrum_board
+```
+
+Run backend:
+```bash
+cd backend
+npm run dev
+```
+
+## 7.3 Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Frontend default URL:
+- `http://localhost:3000`
+
+API base config:
+- `frontend/src/services/api.js`
+- defaults to `/api` when `REACT_APP_API_URL` is not set
+
+For local separate backend, create `frontend/.env`:
+```env
+REACT_APP_API_URL=http://localhost:5001/api
+```
+
+## 8. Deployment (Vercel + MySQL + Cloudinary)
+
+## 8.1 Current Deployment Pattern
+- Frontend deployed on Vercel static build (`frontend/build`)
+- Backend served through Vercel serverless route `/api/[...all].js` -> `backend/src/app`
+- MySQL hosted externally (for example Railway/Aiven/PlanetScale)
+
+## 8.2 Required Environment Variables in Vercel
+Set in Vercel Project -> Settings -> Environment Variables:
+
+```env
+DB_HOST=
+DB_PORT=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
+JWT_SECRET=
+CLIENT_URL=https://your-vercel-domain
+CORS_ALLOWED_ORIGINS=https://your-vercel-domain
+
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+Important:
+- Use public DB host/port from your cloud DB provider.
+- Do not use internal-only hostnames in Vercel.
+- `JWT_SECRET` should be long/random (32+ chars).
+
+## 8.3 Build Settings (if asked manually)
+- Root directory: `./`
+- Install command: `npm --prefix backend install && npm --prefix frontend install --include=dev`
+- Build command: `npm --prefix frontend run build`
+- Output directory: `frontend/build`
+
+## 9. Test Commands
+
+### Backend checks
+```bash
+cd backend
+npm run test:smoke
+npm run test:authz
+npm run test:dnd-roles
+```
+
+### Frontend smoke
+```bash
+cd frontend
+npm run test:smoke
+```
+
+### Playwright E2E
+```bash
+npm install
+npx playwright install
+npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:report
+```
+
+## 10. Common Troubleshooting
+
+### 1) `react-scripts: command not found` in Vercel
+- Ensure frontend dev dependencies are installed:
+  - `npm --prefix frontend install --include=dev`
+
+### 2) `npm ci` lockfile mismatch
+- Run `npm install` in affected workspace and commit updated `package-lock.json`.
+
+### 3) Cannot login on deployed app but local works
+- Deployed DB likely has different data.
+- Seed/import your users into cloud DB.
+- Verify Vercel env vars point to correct DB.
+
+### 4) PowerShell `<` redirection errors with mysql
+Use pipeline style in PowerShell:
+```powershell
+Get-Content .\backend\database\schema.sql | mysql -h <host> -P <port> -u <user> -p <db>
+```
+
+### 5) `Unknown MySQL server host 'mysql.railway.internal'`
+- That host is internal/private.
+- Use public host from provider connection details.
+
+### 6) Kanban route not working
+- Confirm project `board_type = 'kanban'`.
+- Open Kanban from Project Details: `Open Kanban Board`.
+
+## 11. Security Notes
+- Keep `JWT_SECRET`, DB credentials, and Cloudinary secret only in environment variables.
+- Never commit `.env` to git.
+- Restrict CORS to your production domains.
+
+## 12. License
+Internal / educational use unless you add your own license file.

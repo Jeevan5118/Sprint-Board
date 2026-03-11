@@ -1,38 +1,39 @@
 const db = require('../config/database');
+const Team = require('../models/Team');
 const Project = require('../models/Project');
 const { isAdmin } = require('../utils/permissions');
 
 class AnalyticsService {
-  static async ensureProjectAccess(projectId, user) {
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw { statusCode: 404, message: 'Project not found' };
+  static async ensureTeamAccess(teamId, user) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw { statusCode: 404, message: 'Team not found' };
     }
 
     if (!isAdmin(user)) {
       const userTeams = await Project.getUserTeams(user.id);
-      if (!userTeams.includes(project.team_id)) {
+      if (!userTeams.includes(team.id)) {
         throw { statusCode: 403, message: 'Access denied.' };
       }
     }
 
-    return project;
+    return team;
   }
 
-  static async getKanbanAnalytics(projectId, user) {
-    const normalizedProjectId = Number(projectId);
-    if (!Number.isInteger(normalizedProjectId) || normalizedProjectId <= 0) {
-      throw { statusCode: 400, message: 'Project ID must be a valid number' };
+  static async getKanbanAnalytics(teamId, user) {
+    const normalizedTeamId = Number(teamId);
+    if (!Number.isInteger(normalizedTeamId) || normalizedTeamId <= 0) {
+      throw { statusCode: 400, message: 'Team ID must be a valid number' };
     }
 
-    await this.ensureProjectAccess(normalizedProjectId, user);
+    await this.ensureTeamAccess(normalizedTeamId, user);
 
     const [avgLeadTimeHours, avgCycleTimeHours, throughputWeekly, totalLoggedHours, wipCounts] = await Promise.all([
-      this.calculateLeadTime(normalizedProjectId),
-      this.calculateCycleTime(normalizedProjectId),
-      this.calculateThroughputWeekly(normalizedProjectId),
-      this.calculateTotalLoggedHours(normalizedProjectId),
-      this.getWipCounts(normalizedProjectId)
+      this.calculateLeadTime(normalizedTeamId),
+      this.calculateCycleTime(normalizedTeamId),
+      this.calculateThroughputWeekly(normalizedTeamId),
+      this.calculateTotalLoggedHours(normalizedTeamId),
+      this.getWipCounts(normalizedTeamId)
     ]);
 
     return {
@@ -44,14 +45,13 @@ class AnalyticsService {
     };
   }
 
-  static async calculateLeadTime(projectId) {
-    const normalizedProjectId = Number(projectId);
+  static async calculateLeadTime(teamId) {
     const [leadRows] = await db.query(
       `SELECT ROUND(AVG(TIMESTAMPDIFF(SECOND, t.created_at, d.done_at)) / 3600, 2) AS avgLeadTimeHours
        FROM (
          SELECT id, created_at
          FROM tasks
-         WHERE project_id = ? AND sprint_id IS NULL
+         WHERE team_id = ? AND sprint_id IS NULL
        ) t
        INNER JOIN (
          SELECT h.task_id, MIN(CASE WHEN h.to_status = 'done' THEN h.changed_at END) AS done_at
@@ -59,25 +59,24 @@ class AnalyticsService {
          INNER JOIN (
            SELECT id
            FROM tasks
-           WHERE project_id = ? AND sprint_id IS NULL
+           WHERE team_id = ? AND sprint_id IS NULL
          ) pt ON pt.id = h.task_id
          WHERE h.to_status = 'done'
          GROUP BY h.task_id
        ) d ON d.task_id = t.id
        WHERE d.done_at IS NOT NULL`,
-      [normalizedProjectId, normalizedProjectId]
+      [teamId, teamId]
     );
     return leadRows[0]?.avgLeadTimeHours !== null ? Number(leadRows[0].avgLeadTimeHours) : 0;
   }
 
-  static async calculateCycleTime(projectId) {
-    const normalizedProjectId = Number(projectId);
+  static async calculateCycleTime(teamId) {
     const [cycleRows] = await db.query(
       `SELECT ROUND(AVG(TIMESTAMPDIFF(SECOND, d.in_progress_at, d.done_at)) / 3600, 2) AS avgCycleTimeHours
        FROM (
          SELECT id
          FROM tasks
-         WHERE project_id = ? AND sprint_id IS NULL
+         WHERE team_id = ? AND sprint_id IS NULL
        ) t
        INNER JOIN (
          SELECT h.task_id,
@@ -87,7 +86,7 @@ class AnalyticsService {
          INNER JOIN (
            SELECT id
            FROM tasks
-           WHERE project_id = ? AND sprint_id IS NULL
+           WHERE team_id = ? AND sprint_id IS NULL
          ) pt ON pt.id = h.task_id
          WHERE h.to_status IN ('in_progress', 'done')
          GROUP BY h.task_id
@@ -95,13 +94,12 @@ class AnalyticsService {
        WHERE d.in_progress_at IS NOT NULL
          AND d.done_at IS NOT NULL
          AND d.done_at >= d.in_progress_at`,
-      [normalizedProjectId, normalizedProjectId]
+      [teamId, teamId]
     );
     return cycleRows[0]?.avgCycleTimeHours !== null ? Number(cycleRows[0].avgCycleTimeHours) : 0;
   }
 
-  static async calculateThroughputWeekly(projectId) {
-    const normalizedProjectId = Number(projectId);
+  static async calculateThroughputWeekly(teamId) {
     const [rows] = await db.query(
       `SELECT YEARWEEK(d.done_at, 3) AS yearWeek,
               MIN(DATE(d.done_at)) AS weekStartDate,
@@ -112,14 +110,14 @@ class AnalyticsService {
          INNER JOIN (
            SELECT id
            FROM tasks
-           WHERE project_id = ? AND sprint_id IS NULL
+           WHERE team_id = ? AND sprint_id IS NULL
          ) pt ON pt.id = h.task_id
          WHERE h.to_status = 'done'
          GROUP BY h.task_id
        ) d
        GROUP BY YEARWEEK(d.done_at, 3)
        ORDER BY YEARWEEK(d.done_at, 3) ASC`,
-      [normalizedProjectId]
+      [teamId]
     );
 
     return rows.map((row) => ({
@@ -129,23 +127,21 @@ class AnalyticsService {
     }));
   }
 
-  static async calculateTotalLoggedHours(projectId) {
-    const normalizedProjectId = Number(projectId);
+  static async calculateTotalLoggedHours(teamId) {
     const [rows] = await db.query(
       `SELECT ROUND(COALESCE(SUM(ttl.hours), 0), 2) AS totalLoggedHours
        FROM task_time_logs ttl
        INNER JOIN (
          SELECT id
          FROM tasks
-         WHERE project_id = ? AND sprint_id IS NULL
+         WHERE team_id = ? AND sprint_id IS NULL
        ) t ON t.id = ttl.task_id`,
-      [normalizedProjectId]
+      [teamId]
     );
     return rows[0]?.totalLoggedHours !== null ? Number(rows[0].totalLoggedHours) : 0;
   }
 
-  static async getWipCounts(projectId) {
-    const normalizedProjectId = Number(projectId);
+  static async getWipCounts(teamId) {
     const [rows] = await db.query(
       `SELECT
          COALESCE(SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END), 0) AS todo,
@@ -153,8 +149,8 @@ class AnalyticsService {
          COALESCE(SUM(CASE WHEN status = 'in_review' THEN 1 ELSE 0 END), 0) AS in_review,
          COALESCE(SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0) AS done
        FROM tasks
-       WHERE project_id = ? AND sprint_id IS NULL`,
-      [normalizedProjectId]
+       WHERE team_id = ? AND sprint_id IS NULL`,
+      [teamId]
     );
 
     const row = rows[0] || {};

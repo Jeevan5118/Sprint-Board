@@ -1,9 +1,9 @@
 const { param } = require('express-validator');
 
-const kanbanProjectIdValidator = [
-  param('projectId').isInt().withMessage('Project ID must be a number')
+const kanbanTeamIdValidator = [
+  param('teamId').isInt().withMessage('Team ID must be a number')
 ];
 
 module.exports = {
-  kanbanProjectIdValidator
+  kanbanTeamIdValidator
 };

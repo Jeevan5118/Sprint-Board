@@ -361,7 +361,7 @@ const Timeline = () => {
                         const startOffset = daysBetween(range.min, sprint.start_date) * dayWidth;
                         const length = Math.max(2, (daysBetween(sprint.start_date, sprint.end_date) + 1) * dayWidth);
                         const style = statusStyles[sprint.status] || { bg: '#42526E', text: '#FFFFFF' };
-                        const sprintLink = `/projects/${row.project.id}/sprints/${sprint.id}/board`;
+                        const sprintLink = `/teams/${sprint.team_id || row.project.team_id}/sprints/${sprint.id}/board`;
                         return (
                           <div key={sprint.id} className="flex border-t border-[#EEF1F4]">
                             <div

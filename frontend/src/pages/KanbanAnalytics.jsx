@@ -21,7 +21,7 @@ import { getErrorMessage } from '../utils/error';
 const PIE_COLORS = ['#0052CC', '#00A3BF', '#FFAB00', '#36B37E'];
 
 const KanbanAnalytics = () => {
-  const { projectId } = useParams();
+  const { teamId } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [analytics, setAnalytics] = useState(null);
@@ -32,7 +32,7 @@ const KanbanAnalytics = () => {
       setLoading(true);
       setError('');
       try {
-        const res = await api.get(`/analytics/kanban/${projectId}`);
+        const res = await api.get(`/analytics/kanban/team/${teamId}`);
         if (!cancelled) {
           setAnalytics(res.data?.data || null);
         }
@@ -51,7 +51,7 @@ const KanbanAnalytics = () => {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [teamId]);
 
   const throughputData = useMemo(() => {
     const rows = analytics?.throughputWeekly || [];
@@ -91,7 +91,7 @@ const KanbanAnalytics = () => {
           <nav className="flex items-center gap-1 text-[13px] text-gray-400 mb-2">
             <Link to="/projects" className="hover:text-[#0052CC] transition-colors">Projects</Link>
             <span className="mx-1">/</span>
-            <Link to={`/projects/${projectId}`} className="hover:text-[#0052CC] transition-colors">Project</Link>
+            <Link to={`/teams/${teamId}/kanban`} className="hover:text-[#0052CC] transition-colors">Team Board</Link>
             <span className="mx-1">/</span>
             <span className="text-gray-600 font-medium">Kanban Analytics</span>
           </nav>

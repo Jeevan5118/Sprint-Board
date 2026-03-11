@@ -7,7 +7,8 @@ const createTaskValidator = [
     .optional({ nullable: true, checkFalsy: true })
     .matches(/^[A-Za-z0-9_-]{2,20}$/)
     .withMessage('Task key must be 2-20 characters and contain only letters, numbers, "_" or "-"'),
-  body('project_id').isInt().withMessage('Project ID is required and must be a number'),
+  body('project_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Project ID must be a number'),
+  body('team_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Team ID must be a number'),
   body('sprint_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Sprint ID must be a number'),
   body('assigned_to').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Assigned user ID must be a number'),
   body('status').optional().isIn(['todo', 'in_progress', 'in_review', 'done']).withMessage('Invalid status'),
@@ -52,6 +53,10 @@ const sprintIdValidator = [
   param('sprintId').isInt().withMessage('Sprint ID must be a number')
 ];
 
+const teamIdValidator = [
+  param('teamId').isInt().withMessage('Team ID must be a number')
+];
+
 const addLinkValidator = [
   param('id').isInt().withMessage('Task ID must be a number'),
   body('url').isURL().withMessage('Valid URL is required'),
@@ -67,5 +72,6 @@ module.exports = {
   attachmentIdValidator,
   projectIdValidator,
   sprintIdValidator,
+  teamIdValidator,
   addLinkValidator
 };

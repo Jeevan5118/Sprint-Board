@@ -14,6 +14,12 @@ export const taskService = {
     return all.filter((t) => t.sprint_id === null || t.sprint_id === undefined);
   },
 
+  getBacklogByTeam: async (teamId) => {
+    const res = await api.get(`/tasks/team/${teamId}`);
+    const all = res.data.data.tasks || [];
+    return all.filter((t) => t.sprint_id === null || t.sprint_id === undefined);
+  },
+
   updateStatus: async (taskId, status) => {
     const res = await api.patch(`/tasks/${taskId}/status`, { status });
     return res.data.data.task;

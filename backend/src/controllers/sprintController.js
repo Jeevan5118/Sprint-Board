@@ -3,10 +3,10 @@ const SprintService = require('../services/sprintService');
 class SprintController {
   static async createSprint(req, res, next) {
     try {
-      const { name, goal, project_id, start_date, end_date } = req.body;
+      const { name, goal, team_id, project_id, start_date, end_date } = req.body;
 
       const sprint = await SprintService.createSprint(
-        { name, goal, project_id, start_date, end_date },
+        { name, goal, team_id, project_id, start_date, end_date },
         req.user
       );
 
@@ -25,6 +25,21 @@ class SprintController {
       const { projectId } = req.params;
 
       const sprints = await SprintService.getSprintsByProject(projectId, req.user);
+
+      res.status(200).json({
+        success: true,
+        data: { sprints }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSprintsByTeam(req, res, next) {
+    try {
+      const { teamId } = req.params;
+
+      const sprints = await SprintService.getSprintsByTeam(teamId, req.user);
 
       res.status(200).json({
         success: true,

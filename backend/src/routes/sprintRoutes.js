@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const SprintController = require('../controllers/sprintController');
-const { createSprintValidator, sprintIdValidator, projectIdValidator } = require('../validators/sprintValidator');
+const { createSprintValidator, sprintIdValidator, projectIdValidator, teamIdValidator } = require('../validators/sprintValidator');
 const validationMiddleware = require('../middlewares/validationMiddleware');
 const { authMiddleware } = require('../middlewares/authMiddleware');
 
@@ -13,6 +13,9 @@ router.post('/', createSprintValidator, validationMiddleware, SprintController.c
 
 // Get sprints by project
 router.get('/project/:projectId', projectIdValidator, validationMiddleware, SprintController.getSprintsByProject);
+
+// Get sprints by team (team-scoped boards)
+router.get('/team/:teamId', teamIdValidator, validationMiddleware, SprintController.getSprintsByTeam);
 
 // Get sprint by ID
 router.get('/:id', sprintIdValidator, validationMiddleware, SprintController.getSprintById);

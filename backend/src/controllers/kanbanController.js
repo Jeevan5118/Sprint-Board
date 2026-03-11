@@ -1,10 +1,10 @@
 const KanbanService = require('../services/kanbanService');
 
 class KanbanController {
-  static async getProjectKanban(req, res, next) {
+  static async getTeamKanban(req, res, next) {
     try {
-      const { projectId } = req.params;
-      const kanban = await KanbanService.getProjectKanban(projectId, req.user);
+      const { teamId } = req.params;
+      const kanban = await KanbanService.getTeamKanban(teamId, req.user);
 
       res.status(200).json({
         success: true,

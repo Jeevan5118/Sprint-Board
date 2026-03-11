@@ -3,7 +3,8 @@ const { body, param } = require('express-validator');
 const createSprintValidator = [
   body('name').notEmpty().withMessage('Sprint name is required'),
   body('goal').optional(),
-  body('project_id').isInt().withMessage('Project ID is required and must be a number'),
+  body('team_id').isInt().withMessage('Team ID is required and must be a number'),
+  body('project_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Project ID must be a number'),
   body('start_date').isISO8601().withMessage('Valid start date is required'),
   body('end_date').isISO8601().withMessage('Valid end date is required')
 ];
@@ -16,4 +17,8 @@ const projectIdValidator = [
   param('projectId').isInt().withMessage('Project ID must be a number')
 ];
 
-module.exports = { createSprintValidator, sprintIdValidator, projectIdValidator };
+const teamIdValidator = [
+  param('teamId').isInt().withMessage('Team ID must be a number')
+];
+
+module.exports = { createSprintValidator, sprintIdValidator, projectIdValidator, teamIdValidator };

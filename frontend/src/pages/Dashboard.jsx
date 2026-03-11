@@ -89,6 +89,16 @@ const Dashboard = () => {
     setShowProgressChart(true);
   };
 
+  const getAlertTaskLink = (task) => {
+    if (!task?.team_id) {
+      return task?.project_id ? `/projects/${task.project_id}` : '/timeline';
+    }
+    if (task.sprint_id) {
+      return `/teams/${task.team_id}/sprints/${task.sprint_id}/board?taskId=${task.task_id}`;
+    }
+    return `/teams/${task.team_id}/kanban?taskId=${task.task_id}`;
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-10">
@@ -173,7 +183,7 @@ const Dashboard = () => {
                 {(deadlineAlerts.tasks || []).slice(0, 5).map((task) => (
                   <Link
                     key={task.task_id}
-                    to={`/projects/${task.project_id}`}
+                    to={getAlertTaskLink(task)}
                     className="block text-sm border border-[#DFE1E6] rounded-[3px] p-2 bg-[#FAFBFC] hover:border-[#4C9AFF] transition-colors"
                   >
                     <span className="font-semibold text-[#172B4D]">{task.task_key} - {task.task_title}</span>

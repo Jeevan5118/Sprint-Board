@@ -82,47 +82,47 @@ INSERT INTO project_members (project_id, user_id, role) VALUES
 -- ============================================
 -- SPRINTS (Sample Sprints)
 -- ============================================
-INSERT INTO sprints (name, goal, project_id, start_date, end_date, status) VALUES
-('Sprint 1', 'Setup project foundation and authentication', 1, '2024-01-01', '2024-01-14', 'completed'),
-('Sprint 2', 'Product catalog and shopping cart', 1, '2024-01-15', '2024-01-28', 'completed'),
-('Sprint 3', 'Payment integration and checkout', 1, '2024-01-29', '2024-02-11', 'active'),
-('Sprint 1', 'User authentication and onboarding', 2, '2024-02-01', '2024-02-14', 'active'),
-('Sprint 1', 'AWS account setup and VPC configuration', 3, '2024-01-15', '2024-01-28', 'completed'),
-('Sprint 2', 'Database migration and backup strategy', 3, '2024-01-29', '2024-02-11', 'active'),
-('Sprint 1', 'API gateway architecture design', 4, '2024-03-01', '2024-03-14', 'planned');
+INSERT INTO sprints (name, goal, project_id, team_id, start_date, end_date, status) VALUES
+('Sprint 1', 'Setup project foundation and authentication', 1, 1, '2024-01-01', '2024-01-14', 'completed'),
+('Sprint 2', 'Product catalog and shopping cart', 1, 1, '2024-01-15', '2024-01-28', 'completed'),
+('Sprint 3', 'Payment integration and checkout', 1, 1, '2024-01-29', '2024-02-11', 'active'),
+('Sprint 1', 'User authentication and onboarding', 2, 1, '2024-02-01', '2024-02-14', 'active'),
+('Sprint 1', 'AWS account setup and VPC configuration', 3, 2, '2024-01-15', '2024-01-28', 'completed'),
+('Sprint 2', 'Database migration and backup strategy', 3, 2, '2024-01-29', '2024-02-11', 'active'),
+('Sprint 1', 'API gateway architecture design', 4, 2, '2024-03-01', '2024-03-14', 'planned');
 
 -- ============================================
 -- TASKS (Sample Tasks with Story Points)
 -- ============================================
-INSERT INTO tasks (title, description, task_key, sprint_id, project_id, assigned_to, reporter_id, type, priority, status, story_points, estimated_hours) VALUES
+INSERT INTO tasks (title, description, task_key, sprint_id, project_id, team_id, assigned_to, reporter_id, type, priority, status, story_points, estimated_hours) VALUES
 -- Sprint 1 Tasks (ECP)
-('Setup React project structure', 'Initialize React app with routing and state management', 'ECP-1', 1, 1, 3, 2, 'task', 'high', 'done', 3, 8.00),
-('Implement JWT authentication', 'Backend JWT token generation and validation', 'ECP-2', 1, 1, 4, 2, 'story', 'highest', 'done', 5, 16.00),
-('Design database schema', 'Create MySQL database schema for all entities', 'ECP-3', 1, 1, 3, 2, 'task', 'high', 'done', 3, 6.00),
+('Setup React project structure', 'Initialize React app with routing and state management', 'ECP-1', 1, 1, 1, 3, 2, 'task', 'high', 'done', 3, 8.00),
+('Implement JWT authentication', 'Backend JWT token generation and validation', 'ECP-2', 1, 1, 1, 4, 2, 'story', 'highest', 'done', 5, 16.00),
+('Design database schema', 'Create MySQL database schema for all entities', 'ECP-3', 1, 1, 1, 3, 2, 'task', 'high', 'done', 3, 6.00),
 
 -- Sprint 2 Tasks (ECP)
-('Build product listing page', 'Display products with filters and pagination', 'ECP-4', 2, 1, 3, 2, 'story', 'high', 'done', 5, 12.00),
-('Create shopping cart functionality', 'Add/remove items, update quantities', 'ECP-5', 2, 1, 4, 2, 'story', 'high', 'done', 8, 20.00),
-('Fix product image loading bug', 'Images not loading on slow connections', 'ECP-6', 2, 1, 3, 5, 'bug', 'medium', 'done', 2, 4.00),
+('Build product listing page', 'Display products with filters and pagination', 'ECP-4', 2, 1, 1, 3, 2, 'story', 'high', 'done', 5, 12.00),
+('Create shopping cart functionality', 'Add/remove items, update quantities', 'ECP-5', 2, 1, 1, 4, 2, 'story', 'high', 'done', 8, 20.00),
+('Fix product image loading bug', 'Images not loading on slow connections', 'ECP-6', 2, 1, 1, 3, 5, 'bug', 'medium', 'done', 2, 4.00),
 
 -- Sprint 3 Tasks (ECP)
-('Integrate Stripe payment gateway', 'Setup Stripe SDK and payment processing', 'ECP-7', 3, 1, 4, 2, 'story', 'highest', 'in_progress', 8, 24.00),
-('Build checkout page UI', 'Design and implement checkout flow', 'ECP-8', 3, 1, 3, 2, 'story', 'high', 'in_progress', 5, 16.00),
-('Add order confirmation email', 'Send email after successful payment', 'ECP-9', 3, 1, 6, 2, 'task', 'medium', 'todo', 3, 8.00),
-('Write payment integration tests', 'Unit and integration tests for payment flow', 'ECP-10', 3, 1, 5, 2, 'task', 'medium', 'todo', 5, 12.00),
+('Integrate Stripe payment gateway', 'Setup Stripe SDK and payment processing', 'ECP-7', 3, 1, 1, 4, 2, 'story', 'highest', 'in_progress', 8, 24.00),
+('Build checkout page UI', 'Design and implement checkout flow', 'ECP-8', 3, 1, 1, 3, 2, 'story', 'high', 'in_progress', 5, 16.00),
+('Add order confirmation email', 'Send email after successful payment', 'ECP-9', 3, 1, 1, 6, 2, 'task', 'medium', 'todo', 3, 8.00),
+('Write payment integration tests', 'Unit and integration tests for payment flow', 'ECP-10', 3, 1, 1, 5, 2, 'task', 'medium', 'todo', 5, 12.00),
 
 -- Mobile Banking App Tasks
-('Design app navigation structure', 'Bottom tab navigation with screens', 'MBA-1', 4, 2, 7, 2, 'task', 'high', 'in_progress', 3, 8.00),
-('Implement biometric authentication', 'Face ID and fingerprint login', 'MBA-2', 4, 2, 8, 2, 'story', 'highest', 'in_progress', 8, 20.00),
-('Create account dashboard', 'Display account balance and recent transactions', 'MBA-3', 4, 2, 7, 2, 'story', 'high', 'todo', 5, 16.00),
+('Design app navigation structure', 'Bottom tab navigation with screens', 'MBA-1', 4, 2, 1, 7, 2, 'task', 'high', 'in_progress', 3, 8.00),
+('Implement biometric authentication', 'Face ID and fingerprint login', 'MBA-2', 4, 2, 1, 8, 2, 'story', 'highest', 'in_progress', 8, 20.00),
+('Create account dashboard', 'Display account balance and recent transactions', 'MBA-3', 4, 2, 1, 7, 2, 'story', 'high', 'todo', 5, 16.00),
 
 -- Cloud Infrastructure Tasks
-('Setup AWS VPC and subnets', 'Configure network infrastructure', 'CLD-1', 5, 3, 13, 12, 'task', 'highest', 'done', 5, 12.00),
-('Configure RDS MySQL instance', 'Setup managed database with backups', 'CLD-2', 6, 3, 14, 12, 'task', 'high', 'in_progress', 5, 10.00),
-('Implement CI/CD pipeline', 'Setup GitHub Actions for deployment', 'CLD-3', 6, 3, 13, 12, 'story', 'high', 'in_review', 8, 16.00),
+('Setup AWS VPC and subnets', 'Configure network infrastructure', 'CLD-1', 5, 3, 2, 13, 12, 'task', 'highest', 'done', 5, 12.00),
+('Configure RDS MySQL instance', 'Setup managed database with backups', 'CLD-2', 6, 3, 2, 14, 12, 'task', 'high', 'in_progress', 5, 10.00),
+('Implement CI/CD pipeline', 'Setup GitHub Actions for deployment', 'CLD-3', 6, 3, 2, 13, 12, 'story', 'high', 'in_review', 8, 16.00),
 
 -- API Gateway Tasks
-('Design API gateway architecture', 'Document microservices communication pattern', 'AGS-1', 7, 4, 16, 12, 'epic', 'highest', 'todo', 13, 40.00);
+('Design API gateway architecture', 'Document microservices communication pattern', 'AGS-1', 7, 4, 2, 16, 12, 'epic', 'highest', 'todo', 13, 40.00);
 
 -- ============================================
 -- COMMENTS (Sample Comments)
