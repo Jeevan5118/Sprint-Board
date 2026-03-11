@@ -6,21 +6,12 @@ export const taskService = {
     return res.data.data.tasks;
   },
 
-  getBacklogByProject: async (projectId, sprintId) => {
-    // Backlog = project tasks not in the current sprint
+  getBacklogByProject: async (projectId, _sprintId) => {
+    // Backlog = only project tasks not assigned to any sprint.
+    // Do not pull tasks from other sprints into this board.
     const res = await api.get(`/tasks/project/${projectId}`);
     const all = res.data.data.tasks || [];
-    // Hide tasks from completed sprints; they are intentionally immutable.
-    // Keep tasks with no sprint, or tasks from other non-completed sprints.
-    return all.filter(
-      (t) =>
-        t.sprint_status !== 'completed' &&
-        (
-          t.sprint_id === null ||
-          t.sprint_id === undefined ||
-          String(t.sprint_id) !== String(sprintId)
-        )
-    );
+    return all.filter((t) => t.sprint_id === null || t.sprint_id === undefined);
   },
 
   updateStatus: async (taskId, status) => {
