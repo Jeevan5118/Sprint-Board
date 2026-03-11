@@ -177,12 +177,6 @@ class TeamService {
       throw { statusCode: 400, message: 'User is already a team member' };
     }
 
-    // Check team member limit (max 10 members)
-    const members = await Team.getTeamMembers(teamId);
-    if (members.length >= 10) {
-      throw { statusCode: 400, message: 'Team already has maximum 10 members' };
-    }
-
     await Team.addMember(teamId, userId);
     return await this.getTeamById(teamId, requester);
   }
