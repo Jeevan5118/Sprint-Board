@@ -15,7 +15,6 @@ const Teams = () => {
     const [showModal, setShowModal] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
     const [newTeamDescription, setNewTeamDescription] = useState('');
-    const [newTeamLeadId, setNewTeamLeadId] = useState('');
     const [error, setError] = useState('');
     const [expandedTeams, setExpandedTeams] = useState({}); // { teamId: { members: [], loading: false } }
     const [addingMemberTo, setAddingMemberTo] = useState(null);
@@ -125,13 +124,11 @@ const Teams = () => {
         try {
             await teamService.createTeam({
                 name: newTeamName,
-                description: newTeamDescription,
-                team_lead_id: Number(newTeamLeadId)
+                description: newTeamDescription
             });
             setShowModal(false);
             setNewTeamName('');
             setNewTeamDescription('');
-            setNewTeamLeadId('');
             fetchTeams();
             await fetchAvailableMembers();
         } catch (err) {
@@ -623,29 +620,12 @@ const Teams = () => {
                                             rows="4"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-[#5E6C84] mb-2 uppercase tracking-widest">Team Lead</label>
-                                        <select
-                                            value={newTeamLeadId}
-                                            onChange={(e) => setNewTeamLeadId(e.target.value)}
-                                            className="w-full border-2 border-[#DFE1E6] bg-[#FAFBFC] px-4 py-2.5 rounded-lg focus:bg-white focus:border-[#4C9AFF] focus:ring-4 focus:ring-[#E6EFFC] outline-none transition-all text-[15px] font-medium"
-                                            required
-                                        >
-                                            <option value="">Select a team lead</option>
-                                            {availableUsers.map((u) => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.first_name} {u.last_name} ({u.email})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
                                     <div className="flex justify-end gap-3 pt-4">
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setShowModal(false);
                                                 setError('');
-                                                setNewTeamLeadId('');
                                             }}
                                             className="px-6 py-2.5 text-sm font-bold text-[#42526E] hover:bg-[#EBECF0] rounded-lg transition-colors"
                                         >

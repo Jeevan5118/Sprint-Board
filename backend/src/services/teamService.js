@@ -6,23 +6,26 @@ const { isAdmin, canManageTeam } = require('../utils/permissions');
 class TeamService {
   static async createTeam(teamData) {
     const { name, description, team_lead_id } = teamData;
+    let normalizedLeadId = null;
 
-    if (!team_lead_id) {
-      throw { statusCode: 400, message: 'Team lead is required' };
+    if (team_lead_id !== undefined && team_lead_id !== null && team_lead_id !== '') {
+      const teamLead = await User.findById(team_lead_id);
+      if (!teamLead) {
+        throw { statusCode: 404, message: 'Team lead not found' };
+      }
+
+      if (teamLead.role === 'member') {
+        await User.updateRole(team_lead_id, 'team_lead');
+      }
+
+      normalizedLeadId = Number(team_lead_id);
     }
 
-    const teamLead = await User.findById(team_lead_id);
-    if (!teamLead) {
-      throw { statusCode: 404, message: 'Team lead not found' };
+    const teamId = await Team.create({ name, description, team_lead_id: normalizedLeadId });
+
+    if (normalizedLeadId) {
+      await Team.addMember(teamId, normalizedLeadId);
     }
-
-    if (teamLead.role === 'member') {
-      await User.updateRole(team_lead_id, 'team_lead');
-    }
-
-    const teamId = await Team.create({ name, description, team_lead_id });
-
-    await Team.addMember(teamId, team_lead_id);
 
     return await Team.findById(teamId);
   }

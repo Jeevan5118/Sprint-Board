@@ -3,7 +3,7 @@ const { body, param } = require('express-validator');
 const createTeamValidator = [
   body('name').notEmpty().withMessage('Team name is required'),
   body('description').optional(),
-  body('team_lead_id').notEmpty().withMessage('Team lead is required').bail().isInt().withMessage('Team lead ID must be a number')
+  body('team_lead_id').optional({ nullable: true, checkFalsy: true }).isInt().withMessage('Team lead ID must be a number')
 ];
 
 const addMemberValidator = [
