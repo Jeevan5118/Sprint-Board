@@ -25,6 +25,7 @@ CREATE TABLE users (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     role ENUM('admin', 'team_lead', 'member') DEFAULT 'member',
+    doj DATE NULL,
     avatar_url VARCHAR(500),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

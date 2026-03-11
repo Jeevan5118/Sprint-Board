@@ -40,12 +40,12 @@ class AuthController {
 
   static async createUserByAdmin(req, res, next) {
     try {
-      const { email, password, first_name, last_name, team_id, role } = req.body;
+      const { email, password, name, doj, team_id, role } = req.body;
       const result = await AuthService.createUserByAdmin({
         email,
         password,
-        first_name,
-        last_name,
+        name,
+        doj,
         team_id,
         role
       });

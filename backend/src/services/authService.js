@@ -35,10 +35,29 @@ class AuthService {
   }
 
   static async createUserByAdmin(userData) {
-    const { email, password, first_name, last_name, team_id, role = 'member' } = userData;
+    const { email, password, team_id, role = 'member' } = userData;
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedRole = ['member', 'team_lead', 'admin'].includes(role) ? role : 'member';
     const teamId = Number(team_id);
+    const normalizedName = String(userData.name || '').trim();
+    const normalizedDoj = String(userData.doj || '').trim();
+
+    let firstName = String(userData.first_name || '').trim();
+    let lastName = String(userData.last_name || '').trim();
+
+    if (normalizedName) {
+      const parts = normalizedName.split(/\s+/).filter(Boolean);
+      firstName = parts.shift() || '';
+      lastName = parts.join(' ');
+    }
+
+    if (!firstName) {
+      throw { statusCode: 400, message: 'Member name is required' };
+    }
+
+    if (!normalizedDoj) {
+      throw { statusCode: 400, message: 'DOJ is required' };
+    }
 
     if (!Number.isInteger(teamId) || teamId <= 0) {
       throw { statusCode: 400, message: 'Valid team_id is required' };
@@ -58,9 +77,10 @@ class AuthService {
     const userId = await User.create({
       email: normalizedEmail,
       password: hashedPassword,
-      first_name,
-      last_name,
-      role: normalizedRole
+      first_name: firstName,
+      last_name: lastName,
+      role: normalizedRole,
+      doj: normalizedDoj
     });
 
     await Team.addMember(teamId, userId);

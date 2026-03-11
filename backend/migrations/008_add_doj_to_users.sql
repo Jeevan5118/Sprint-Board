@@ -1,0 +1,2 @@
+ALTER TABLE users
+  ADD COLUMN doj DATE NULL AFTER role;

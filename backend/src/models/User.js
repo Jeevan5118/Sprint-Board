@@ -12,12 +12,24 @@ class User {
   }
 
   static async create(userData) {
-    const { email, password, first_name, last_name, role = 'member' } = userData;
-    const [result] = await db.query(
-      'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)',
-      [email, password, first_name, last_name, role]
-    );
-    return result.insertId;
+    const { email, password, first_name, last_name, role = 'member', doj = null } = userData;
+    try {
+      const [result] = await db.query(
+        'INSERT INTO users (email, password, first_name, last_name, role, doj) VALUES (?, ?, ?, ?, ?, ?)',
+        [email, password, first_name, last_name, role, doj]
+      );
+      return result.insertId;
+    } catch (error) {
+      // Backward compatibility when doj column migration is not applied yet.
+      if (error?.code === 'ER_BAD_FIELD_ERROR') {
+        const [result] = await db.query(
+          'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)',
+          [email, password, first_name, last_name, role]
+        );
+        return result.insertId;
+      }
+      throw error;
+    }
   }
 
   static async countAdmins() {

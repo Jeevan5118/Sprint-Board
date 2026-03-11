@@ -20,10 +20,10 @@ const Account = () => {
   const [success, setSuccess] = useState('');
   const [teams, setTeams] = useState([]);
   const [createForm, setCreateForm] = useState({
-    first_name: '',
-    last_name: '',
+    name: '',
     email: '',
     password: '',
+    doj: '',
     team_id: '',
     role: 'member'
   });
@@ -119,10 +119,10 @@ const Account = () => {
       });
       setCreateSuccess('Employee account created and assigned to team.');
       setCreateForm({
-        first_name: '',
-        last_name: '',
+        name: '',
         email: '',
         password: '',
+        doj: '',
         team_id: '',
         role: 'member'
       });
@@ -224,29 +224,16 @@ const Account = () => {
               </div>
             )}
             <form onSubmit={handleCreateUser} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#5E6C84] mb-1.5 uppercase">First Name</label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={createForm.first_name}
-                    onChange={handleCreateFormChange}
-                    className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#5E6C84] mb-1.5 uppercase">Last Name</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={createForm.last_name}
-                    onChange={handleCreateFormChange}
-                    className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#5E6C84] mb-1.5 uppercase">Member Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={createForm.name}
+                  onChange={handleCreateFormChange}
+                  className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
+                  required
+                />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -269,6 +256,17 @@ const Account = () => {
                     onChange={handleCreateFormChange}
                     className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
                     minLength={6}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#5E6C84] mb-1.5 uppercase">DOJ (Date of Joining)</label>
+                  <input
+                    type="date"
+                    name="doj"
+                    value={createForm.doj}
+                    onChange={handleCreateFormChange}
+                    className="w-full border border-[#DFE1E6] bg-white px-3 py-2 rounded-[3px] text-sm focus:outline-none focus:border-[#4C9AFF]"
                     required
                   />
                 </div>
